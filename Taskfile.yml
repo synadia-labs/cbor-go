@@ -2,8 +2,7 @@ version: '3'
 
 vars:
   VECTORS_DIR: tests/community-test-vectors
-  VERSION:
-    sh: cat VERSION
+  VERSION: 0.0.2
 
 tasks:
   version:
@@ -43,11 +42,11 @@ tasks:
     desc: Run Go fuzz tests across runtime, JSON interop, and structs packages
     deps:
       - fetch-vectors
-    vars:
-      FUZZ_TIME: 5s
+    env:
+      FUZZ_TIME: '{{default "5s" .ENV.FUZZ_TIME}}'
     cmds:
-      - go test ./tests/runtime-compliance -run=^$ -fuzz=FuzzRuntimeReaderBasic -fuzztime={{.FUZZ_TIME}}
-      - go test ./tests/structs -run=^$ -fuzz=FuzzDecodeSafeTrusted -fuzztime={{.FUZZ_TIME}}
-      - go test ./tests/community-test-vectors -run=^$ -fuzz=FuzzCommunityVectors -fuzztime={{.FUZZ_TIME}}
-      - go test ./tests/runtime-sequences -run=^$ -fuzz=FuzzCBORSequences -fuzztime={{.FUZZ_TIME}}
-      - go test ./tests/json-interop -run=^$ -fuzz=FuzzJSONInterop -fuzztime={{.FUZZ_TIME}}
+      - go test ./tests/runtime-compliance -run=^$ -fuzz=FuzzRuntimeReaderBasic -fuzztime=$FUZZ_TIME
+      - go test ./tests/structs -run=^$ -fuzz=FuzzDecodeSafeTrusted -fuzztime=$FUZZ_TIME
+      - go test ./tests/community-test-vectors -run=^$ -fuzz=FuzzCommunityVectors -fuzztime=$FUZZ_TIME
+      - go test ./tests/runtime-sequences -run=^$ -fuzz=FuzzCBORSequences -fuzztime=$FUZZ_TIME
+      - go test ./tests/json-interop -run=^$ -fuzz=FuzzJSONInterop -fuzztime=$FUZZ_TIME

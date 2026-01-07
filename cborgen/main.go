@@ -19,9 +19,9 @@ import (
 //   - verbose: turn on diagnostic logging
 //
 // In directory mode, each source file gets its own
-// "*_cbor.go" companion file and the --output flag is rejected.
+// "*_cbor.go" companion file (recursive) and the --output flag is rejected.
 type CLI struct {
-	Input   string   `short:"i" help:"Input Go file or directory" default:"${env:GOFILE}"`
+	Input   string   `short:"i" help:"Input Go file or directory (recursive)" default:"."`
 	Output  string   `short:"o" help:"Output file (file input only; defaults to {input}_cbor.go)"`
 	Structs []string `short:"s" help:"Only generate for these struct types (may be repeated)"`
 	Verbose bool     `short:"v" help:"Enable verbose diagnostics"`
@@ -42,7 +42,7 @@ func main() {
 func run(cli *CLI) error {
 	input := strings.TrimSpace(cli.Input)
 	if input == "" {
-		return errors.New("no input specified (use --input or set GOFILE)")
+		input = "."
 	}
 
 	info, err := os.Stat(input)
@@ -65,42 +65,43 @@ func run(cli *CLI) error {
 	return generateForFile(input, out, cli.Verbose, cli.Structs)
 }
 
-// runForDir walks a directory and generates a companion
+// runForDir walks a directory tree and generates a companion
 // "*_cbor.go" file for each eligible Go source file.
 func runForDir(dir string, verbose bool, structs []string) error {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return fmt.Errorf("read dir %q: %w", dir, err)
-	}
-
-	for _, entry := range entries {
+	if err := filepath.WalkDir(dir, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return fmt.Errorf("walk %q: %w", path, err)
+		}
 		if entry.IsDir() {
-			continue
+			return nil
 		}
 
 		name := entry.Name()
 		if !strings.HasSuffix(name, ".go") {
-			continue
+			return nil
 		}
 		if strings.HasSuffix(name, "_test.go") || strings.HasSuffix(name, "_cbor.go") {
-			continue
+			return nil
 		}
 
-		inPath := filepath.Join(dir, name)
 		info, err := entry.Info()
 		if err != nil {
 			// If we can't stat a file, treat it as fatal
 			// to avoid silently skipping sources.
-			return fmt.Errorf("stat %q: %w", inPath, err)
+			return fmt.Errorf("stat %q: %w", path, err)
 		}
 		if !info.Mode().IsRegular() {
-			continue
+			return nil
 		}
 
-		outPath := defaultOutputPath(inPath)
-		if err := generateForFile(inPath, outPath, verbose, structs); err != nil {
+		outPath := defaultOutputPath(path)
+		if err := generateForFile(path, outPath, verbose, structs); err != nil {
 			return err
 		}
+
+		return nil
+	}); err != nil {
+		return err
 	}
 
 	return nil

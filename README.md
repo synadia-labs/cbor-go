@@ -110,7 +110,7 @@ go run github.com/synadia-labs/cbor-go/cborgen@latest -i mytypes.go -o internal/
 
 Flags:
 
-- `-i, --input`   – Go file or directory to process (defaults to `$GOFILE`).
+- `-i, --input`   – Go file or directory to process (recursive; defaults to `.`).
 - `-o, --output`  – Output file path (file mode only; default `{input}_cbor.go`).
 - `-v, --verbose` – Enable verbose diagnostics.
 
@@ -131,7 +131,7 @@ In a Go source file in your module, add a `go generate` directive:
   - You may override the output path with `-o`.
 
 - **Directory input** (`-i ./internal/model`)
-  - For each Go source file in the directory:
+  - For each Go source file in the directory tree:
     - Includes files ending in `.go`.
     - Excludes `*_test.go` and `*_cbor.go`.
   - Generates a corresponding `{file}_cbor.go` next to each included file.
