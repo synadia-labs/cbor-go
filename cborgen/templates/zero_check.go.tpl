@@ -1,5 +1,5 @@
 {{/*
-Expression used for omitempty zero checks.
+Expression used for omitempty inclusion (non-zero) checks.
 
 Inputs:
   .Receiver  - receiver identifier (e.g. "x")
@@ -9,20 +9,20 @@ Inputs:
                "time",
                "ptrOrInterface", "slice", "map".
 */}}
-{{define "zeroCheck"}}
+{{define "omitEmptyCond"}}
 {{- if eq .Kind "string" -}}
-{{ .Receiver }}.{{ .Field }} == ""
+{{ .Receiver }}.{{ .Field }} != ""
 {{- else if eq .Kind "bool" -}}
-!{{ .Receiver }}.{{ .Field }}
+{{ .Receiver }}.{{ .Field }}
 {{- else if eq .Kind "numeric" -}}
-{{ .Receiver }}.{{ .Field }} == 0
+{{ .Receiver }}.{{ .Field }} != 0
 {{- else if eq .Kind "time" -}}
-{{ .Receiver }}.{{ .Field }}.IsZero()
+!{{ .Receiver }}.{{ .Field }}.IsZero()
 {{- else if eq .Kind "ptrOrInterface" -}}
-{{ .Receiver }}.{{ .Field }} == nil
+{{ .Receiver }}.{{ .Field }} != nil
 {{- else if eq .Kind "slice" -}}
-len({{ .Receiver }}.{{ .Field }}) == 0
+len({{ .Receiver }}.{{ .Field }}) != 0
 {{- else if eq .Kind "map" -}}
-len({{ .Receiver }}.{{ .Field }}) == 0
+len({{ .Receiver }}.{{ .Field }}) != 0
 {{- end -}}
 {{end}}

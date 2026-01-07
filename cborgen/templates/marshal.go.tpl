@@ -19,32 +19,37 @@ func (x *{{.Name}}) MarshalCBOR(b []byte) ([]byte, error) {
 {{end}}
 {{if $.UseOmit}}
 	{{- if .HasOmit }}
-	count := uint32(0)
+	count := uint32({{.NonOmitCount}})
 {{- range .Fields -}}
 {{- if .OmitEmpty }}
-	if !({{.ZeroCheck}}) { count++ }
-{{- else }}
-	count++
+	if {{.OmitEmptyCond}} { count++ }
 {{- end }}
 {{- end }}
 	b = {{rt "AppendMapHeader"}}(b, count)
 	{{- else }}
 	b = {{rt "AppendMapHeader"}}(b, uint32({{len .Fields}}))
 	{{- end }}
+	{{- if .EncodeNeedsErr }}
 	var err error
+	{{- end }}
 {{- range .Fields }}
 {{- if .OmitEmpty }}
-	if !({{.ZeroCheck}}) {
+	if {{.OmitEmptyCond}} {
 		{{- if .EncodeBlock }}
 		{{.EncodeBlock}}
 		{{- else }}
 		b = {{rt "AppendString"}}(b, "{{.CBORName}}")
 			{{- if .EncodeExpr }}
+				{{- if .EncodeExprReturnsError }}
 		b, err = {{.EncodeExpr}}
+		if err != nil { return b, err }
+				{{- else }}
+		b = {{.EncodeExpr}}
+				{{- end }}
 			{{- else }}
 		b, err = {{rt "AppendInterface"}}(b, x.{{.GoName}})
-			{{- end }}
 		if err != nil { return b, err }
+			{{- end }}
 		{{- end }}
 	}
 {{- else }}
@@ -53,28 +58,40 @@ func (x *{{.Name}}) MarshalCBOR(b []byte) ([]byte, error) {
 	{{- else }}
 	b = {{rt "AppendString"}}(b, "{{.CBORName}}")
 		{{- if .EncodeExpr }}
+			{{- if .EncodeExprReturnsError }}
 	b, err = {{.EncodeExpr}}
+	if err != nil { return b, err }
+			{{- else }}
+	b = {{.EncodeExpr}}
+			{{- end }}
 		{{- else }}
 	b, err = {{rt "AppendInterface"}}(b, x.{{.GoName}})
-		{{- end }}
 	if err != nil { return b, err }
+		{{- end }}
 	{{- end }}
 {{- end }}
 {{- end }}
 {{else}}
 	b = {{rt "AppendMapHeader"}}(b, {{len .Fields}})
+	{{- if .EncodeNeedsErr }}
 	var err error
+	{{- end }}
 {{- range .Fields }}
 	{{- if .EncodeBlock }}
 	{{.EncodeBlock}}
 	{{- else }}
 	b = {{rt "AppendString"}}(b, "{{.CBORName}}")
 		{{- if .EncodeExpr }}
+			{{- if .EncodeExprReturnsError }}
 	b, err = {{.EncodeExpr}}
+	if err != nil { return b, err }
+			{{- else }}
+	b = {{.EncodeExpr}}
+			{{- end }}
 		{{- else }}
 	b, err = {{rt "AppendInterface"}}(b, x.{{.GoName}})
-		{{- end }}
 	if err != nil { return b, err }
+		{{- end }}
 	{{- end }}
 {{- end }}
 {{end}}

@@ -16,25 +16,17 @@ func (x *Person) MarshalCBOR(b []byte) ([]byte, error) {
 
 	b = cbor.Require(b, x.Msgsize())
 
-	count := uint32(0)
-	count++
-	if !(x.Age == 0) {
+	count := uint32(2)
+	if x.Age != 0 {
 		count++
 	}
-	count++
 	b = cbor.AppendMapHeader(b, count)
 	var err error
 	b = cbor.AppendString(b, "name")
-	b, err = cbor.AppendString(b, x.Name), nil
-	if err != nil {
-		return b, err
-	}
-	if !(x.Age == 0) {
+	b = cbor.AppendString(b, x.Name)
+	if x.Age != 0 {
 		b = cbor.AppendString(b, "age")
-		b, err = cbor.AppendInt(b, x.Age), nil
-		if err != nil {
-			return b, err
-		}
+		b = cbor.AppendInt(b, x.Age)
 	}
 	b = cbor.AppendString(b, "data")
 	b, err = cbor.AppendInterface(b, x.Data)

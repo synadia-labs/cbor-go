@@ -23,75 +23,33 @@ func (x *Scalars) MarshalCBOR(b []byte) ([]byte, error) {
 	b = cbor.AppendMapHeader(b, uint32(20))
 	var err error
 	b = cbor.AppendString(b, "s")
-	b, err = cbor.AppendString(b, x.S), nil
-	if err != nil {
-		return b, err
-	}
+	b = cbor.AppendString(b, x.S)
 	b = cbor.AppendString(b, "b")
-	b, err = cbor.AppendBool(b, x.B), nil
-	if err != nil {
-		return b, err
-	}
+	b = cbor.AppendBool(b, x.B)
 	b = cbor.AppendString(b, "i")
-	b, err = cbor.AppendInt(b, x.I), nil
-	if err != nil {
-		return b, err
-	}
+	b = cbor.AppendInt(b, x.I)
 	b = cbor.AppendString(b, "i8")
-	b, err = cbor.AppendInt8(b, x.I8), nil
-	if err != nil {
-		return b, err
-	}
+	b = cbor.AppendInt8(b, x.I8)
 	b = cbor.AppendString(b, "i16")
-	b, err = cbor.AppendInt16(b, x.I16), nil
-	if err != nil {
-		return b, err
-	}
+	b = cbor.AppendInt16(b, x.I16)
 	b = cbor.AppendString(b, "i32")
-	b, err = cbor.AppendInt32(b, x.I32), nil
-	if err != nil {
-		return b, err
-	}
+	b = cbor.AppendInt32(b, x.I32)
 	b = cbor.AppendString(b, "i64")
-	b, err = cbor.AppendInt64(b, x.I64), nil
-	if err != nil {
-		return b, err
-	}
+	b = cbor.AppendInt64(b, x.I64)
 	b = cbor.AppendString(b, "u")
-	b, err = cbor.AppendUint(b, x.U), nil
-	if err != nil {
-		return b, err
-	}
+	b = cbor.AppendUint(b, x.U)
 	b = cbor.AppendString(b, "u8")
-	b, err = cbor.AppendUint8(b, x.U8), nil
-	if err != nil {
-		return b, err
-	}
+	b = cbor.AppendUint8(b, x.U8)
 	b = cbor.AppendString(b, "u16")
-	b, err = cbor.AppendUint16(b, x.U16), nil
-	if err != nil {
-		return b, err
-	}
+	b = cbor.AppendUint16(b, x.U16)
 	b = cbor.AppendString(b, "u32")
-	b, err = cbor.AppendUint32(b, x.U32), nil
-	if err != nil {
-		return b, err
-	}
+	b = cbor.AppendUint32(b, x.U32)
 	b = cbor.AppendString(b, "u64")
-	b, err = cbor.AppendUint64(b, x.U64), nil
-	if err != nil {
-		return b, err
-	}
+	b = cbor.AppendUint64(b, x.U64)
 	b = cbor.AppendString(b, "f32")
-	b, err = cbor.AppendFloat32(b, x.F32), nil
-	if err != nil {
-		return b, err
-	}
+	b = cbor.AppendFloat32(b, x.F32)
 	b = cbor.AppendString(b, "f64")
-	b, err = cbor.AppendFloat64(b, x.F64), nil
-	if err != nil {
-		return b, err
-	}
+	b = cbor.AppendFloat64(b, x.F64)
 	b = cbor.AppendString(b, "data")
 	b, err = cbor.AppendInterface(b, x.Data)
 	if err != nil {
@@ -117,15 +75,9 @@ func (x *Scalars) MarshalCBOR(b []byte) ([]byte, error) {
 		b = cbor.AppendInt(b, v)
 	}
 	b = cbor.AppendString(b, "t")
-	b, err = cbor.AppendTime(b, x.T), nil
-	if err != nil {
-		return b, err
-	}
+	b = cbor.AppendTime(b, x.T)
 	b = cbor.AppendString(b, "d")
-	b, err = cbor.AppendDuration(b, x.D), nil
-	if err != nil {
-		return b, err
-	}
+	b = cbor.AppendDuration(b, x.D)
 
 	return b, nil
 }
@@ -614,25 +566,20 @@ func (x *Nested) MarshalCBOR(b []byte) ([]byte, error) {
 
 	b = cbor.Require(b, x.Msgsize())
 
-	count := uint32(0)
-	count++
-	count++
-	if !(x.Ptr == nil) {
+	count := uint32(2)
+	if x.Ptr != nil {
 		count++
 	}
 	b = cbor.AppendMapHeader(b, count)
 	var err error
 	b = cbor.AppendString(b, "id")
-	b, err = cbor.AppendString(b, x.ID), nil
-	if err != nil {
-		return b, err
-	}
+	b = cbor.AppendString(b, x.ID)
 	b = cbor.AppendString(b, "base")
 	b, err = x.Base.MarshalCBOR(b)
 	if err != nil {
 		return b, err
 	}
-	if !(x.Ptr == nil) {
+	if x.Ptr != nil {
 		b = cbor.AppendString(b, "ptr")
 		b, err = cbor.AppendPtrMarshaler(b, x.Ptr)
 		if err != nil {

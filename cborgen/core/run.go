@@ -59,23 +59,27 @@ func Run(inputPath, outputPath string, opts Options) error {
 }
 
 type fieldSpec struct {
-	GoName          string
-	CBORName        string
-	OmitEmpty       bool
-	ZeroCheck       string
-	DecodeCaseSafe  string
-	DecodeCaseTrust string
-	EncodeCase      string
-	EncodeExpr      string
-	EncodeBlock     string
-	Ignore          bool
+	GoName                 string
+	CBORName               string
+	OmitEmpty              bool
+	OmitEmptyCond          string
+	DecodeCaseSafe         string
+	DecodeCaseTrust        string
+	EncodeCase             string
+	EncodeExpr             string
+	EncodeExprReturnsError bool
+	EncodeBlock            string
+	EncodeBlockUsesError   bool
+	Ignore                 bool
 }
 
 type structSpec struct {
-	Name        string
-	Fields      []fieldSpec
-	MsgSizeExpr string
-	HasOmit     bool
+	Name           string
+	Fields         []fieldSpec
+	MsgSizeExpr    string
+	HasOmit        bool
+	EncodeNeedsErr bool
+	NonOmitCount   int
 }
 
 // generateStructCode finds struct types in the given file and generates
@@ -139,13 +143,16 @@ func generateStructCode(fset *token.FileSet, file *ast.File, outputPath, pkg str
 					continue
 				}
 				if fs.OmitEmpty {
-					if z, ok := zeroCheckExpr(name, field.Type); ok {
-						fs.ZeroCheck = z
+					if cond, ok := omitEmptyCondExpr(name, field.Type); ok {
+						fs.OmitEmptyCond = cond
 						useOmit = true
 						ss.HasOmit = true
 					} else {
 						fs.OmitEmpty = false
 					}
+				}
+				if !fs.OmitEmpty {
+					ss.NonOmitCount++
 				}
 				// Accumulate contribution to Msgsize expression where supported.
 				if szExpr, ok := fieldSizeExpr(fs.CBORName, fs.GoName, field.Type); ok {
@@ -154,8 +161,20 @@ func generateStructCode(fset *token.FileSet, file *ast.File, outputPath, pkg str
 				if ec, ok := encodeCaseExpr(fs.GoName, field.Type); ok {
 					fs.EncodeCase = ec
 				}
-				fs.EncodeExpr = encodeExprForField(fs.GoName, field.Type)
-				fs.EncodeBlock = encodeBlockForField(ss.Name, fs.GoName, fs.CBORName, field.Type)
+				fs.EncodeExpr, fs.EncodeExprReturnsError = encodeExprForField(fs.GoName, field.Type)
+				fs.EncodeBlock, fs.EncodeBlockUsesError = encodeBlockForField(ss.Name, fs.GoName, fs.CBORName, field.Type)
+				switch {
+				case fs.EncodeBlock != "":
+					if fs.EncodeBlockUsesError {
+						ss.EncodeNeedsErr = true
+					}
+				case fs.EncodeExpr != "":
+					if fs.EncodeExprReturnsError {
+						ss.EncodeNeedsErr = true
+					}
+				default:
+					ss.EncodeNeedsErr = true
+				}
 				if dc, ok := decodeCaseExprSafe(ss.Name, fs.GoName, field.Type); ok {
 					fs.DecodeCaseSafe = dc
 				} else {
@@ -283,13 +302,13 @@ func splitNameOptions(tag string) (string, bool) {
 	return name, omit
 }
 
-type zeroCheckTemplateData struct {
+type omitEmptyCondTemplateData struct {
 	Receiver string
 	Field    string
 	Kind     string
 }
 
-var zeroCheckTemplate = template.Must(template.New("zero_check").Funcs(templateFuncs).ParseFS(tmplfs.FS, "zero_check.go.tpl"))
+var omitEmptyCondTemplate = template.Must(template.New("omit_empty_cond").Funcs(templateFuncs).ParseFS(tmplfs.FS, "zero_check.go.tpl"))
 
 type decodeCaseTemplateData struct {
 	Field    string
@@ -471,7 +490,7 @@ func fieldSizeExpr(cborName, goName string, typ ast.Expr) (expr string, ok bool)
 // handling is required. The block is written in terms of receiver 'x'
 // and appends to the buffer 'b', following the MarshalCBOR template
 // style.
-func encodeBlockForField(structName, goName, cborName string, typ ast.Expr) string {
+func encodeBlockForField(structName, goName, cborName string, typ ast.Expr) (string, bool) {
 	data := encodeBlockTemplateData{
 		StructName: structName,
 		GoField:    goName,
@@ -487,7 +506,7 @@ func encodeBlockForField(structName, goName, cborName string, typ ast.Expr) stri
 	case *ast.MapType:
 		keyIdent, okKey := t.Key.(*ast.Ident)
 		if !okKey {
-			return ""
+			return "", false
 		}
 
 		// map[uint64]*T where *T has MarshalCBOR (assumed for exported T).
@@ -553,7 +572,7 @@ func encodeBlockForField(structName, goName, cborName string, typ ast.Expr) stri
 
 	case *ast.ArrayType:
 		if t.Len != nil {
-			return ""
+			return "", false
 		}
 
 		// Scalar slices: []bool, []int*, []uint*, []float*, []string.
@@ -611,14 +630,23 @@ func encodeBlockForField(structName, goName, cborName string, typ ast.Expr) stri
 	}
 
 	if tmplName == "" {
-		return ""
+		return "", false
 	}
 
 	var buf bytes.Buffer
 	if err := encodeBlockTemplate.ExecuteTemplate(&buf, tmplName, data); err != nil {
-		return ""
+		return "", false
 	}
-	return strings.TrimRight(buf.String(), "\n")
+	usesErr := false
+	switch tmplName {
+	case "encodeMapUint64PtrMarshaler",
+		"encodeMapStrValueMarshaler",
+		"encodeMapStrPtrMarshaler",
+		"encodeSlicePtrMarshaler",
+		"encodeSliceValueMarshaler":
+		usesErr = true
+	}
+	return strings.TrimRight(buf.String(), "\n"), usesErr
 }
 
 // encodeCaseExpr builds the body of an EncodeMsg field write for the
@@ -658,11 +686,11 @@ func encodeCaseExpr(goName string, typ ast.Expr) (string, bool) {
 	return "", false
 }
 
-// zeroCheckExpr builds a zero-check expression for a field of the given
+// omitEmptyCondExpr builds a non-zero check expression for a field of the given
 // Go name and type. The expression is written in terms of receiver 'x'.
 // Returns ok=false if the type is not supported for omitempty.
-func zeroCheckExpr(goName string, typ ast.Expr) (expr string, ok bool) {
-	data := zeroCheckTemplateData{
+func omitEmptyCondExpr(goName string, typ ast.Expr) (expr string, ok bool) {
+	data := omitEmptyCondTemplateData{
 		Receiver: "x",
 		Field:    goName,
 	}
@@ -708,7 +736,7 @@ func zeroCheckExpr(goName string, typ ast.Expr) (expr string, ok bool) {
 	}
 
 	var buf bytes.Buffer
-	if err := zeroCheckTemplate.ExecuteTemplate(&buf, "zeroCheck", data); err != nil {
+	if err := omitEmptyCondTemplate.ExecuteTemplate(&buf, "omitEmptyCond", data); err != nil {
 		return "", false
 	}
 	expr = strings.TrimSpace(buf.String())
@@ -1317,8 +1345,9 @@ var marshalTemplate = template.Must(template.New("marshal.go.tpl").Funcs(templat
 
 // encodeExprForField returns a concrete encode expression for a field
 // where we want to avoid the generic AppendInterface path. It returns an
-// empty string when the generic path should be used.
-func encodeExprForField(goName string, typ ast.Expr) string {
+// empty string when the generic path should be used, along with whether
+// the expression returns an error.
+func encodeExprForField(goName string, typ ast.Expr) (expr string, returnsErr bool) {
 	field := "x." + goName
 	rt := runtimeName
 
@@ -1328,46 +1357,46 @@ func encodeExprForField(goName string, typ ast.Expr) string {
 		// avoid the overhead of AppendInterface in hot paths.
 		switch t.Name {
 		case "string":
-			return rt("AppendString") + "(b, " + field + "), nil"
+			return rt("AppendString") + "(b, " + field + ")", false
 		case "bool":
-			return rt("AppendBool") + "(b, " + field + "), nil"
+			return rt("AppendBool") + "(b, " + field + ")", false
 		case "int":
-			return rt("AppendInt") + "(b, " + field + "), nil"
+			return rt("AppendInt") + "(b, " + field + ")", false
 		case "int8":
-			return rt("AppendInt8") + "(b, " + field + "), nil"
+			return rt("AppendInt8") + "(b, " + field + ")", false
 		case "int16":
-			return rt("AppendInt16") + "(b, " + field + "), nil"
+			return rt("AppendInt16") + "(b, " + field + ")", false
 		case "int32", "rune":
-			return rt("AppendInt32") + "(b, " + field + "), nil"
+			return rt("AppendInt32") + "(b, " + field + ")", false
 		case "int64":
-			return rt("AppendInt64") + "(b, " + field + "), nil"
+			return rt("AppendInt64") + "(b, " + field + ")", false
 		case "uint":
-			return rt("AppendUint") + "(b, " + field + "), nil"
+			return rt("AppendUint") + "(b, " + field + ")", false
 		case "uint8", "byte":
-			return rt("AppendUint8") + "(b, " + field + "), nil"
+			return rt("AppendUint8") + "(b, " + field + ")", false
 		case "uint16":
-			return rt("AppendUint16") + "(b, " + field + "), nil"
+			return rt("AppendUint16") + "(b, " + field + ")", false
 		case "uint32":
-			return rt("AppendUint32") + "(b, " + field + "), nil"
+			return rt("AppendUint32") + "(b, " + field + ")", false
 		case "uint64":
-			return rt("AppendUint64") + "(b, " + field + "), nil"
+			return rt("AppendUint64") + "(b, " + field + ")", false
 		case "float32":
-			return rt("AppendFloat32") + "(b, " + field + "), nil"
+			return rt("AppendFloat32") + "(b, " + field + ")", false
 		case "float64":
-			return rt("AppendFloat64") + "(b, " + field + "), nil"
+			return rt("AppendFloat64") + "(b, " + field + ")", false
 		}
 		// For non-primitive identifiers, assume a struct type with
 		// a generated or user-defined MarshalCBOR method.
-		return field + ".MarshalCBOR(b)"
+		return field + ".MarshalCBOR(b)", true
 
 	case *ast.ArrayType:
 		// Slices: specialize []string; more complex shapes rely on
 		// EncodeBlock-generated loops when appropriate.
 		if t.Len != nil {
-			return ""
+			return "", false
 		}
 		if ident, ok := t.Elt.(*ast.Ident); ok && ident.Name == "string" {
-			return rt("AppendStringSlice") + "(b, " + field + "), nil"
+			return rt("AppendStringSlice") + "(b, " + field + ")", false
 		}
 
 	case *ast.MapType:
@@ -1376,18 +1405,18 @@ func encodeExprForField(goName string, typ ast.Expr) string {
 		// EncodeBlock-generated loops.
 		keyIdent, okKey := t.Key.(*ast.Ident)
 		if !okKey {
-			return ""
+			return "", false
 		}
 		if keyIdent.Name == "string" {
 			if valIdent, okVal := t.Value.(*ast.Ident); okVal && valIdent.Name == "string" {
-				return rt("AppendMapStrStr") + "(b, " + field + "), nil"
+				return rt("AppendMapStrStr") + "(b, " + field + ")", false
 			}
 		}
 
 	case *ast.StarExpr:
 		// *T where T is exported; assume *T implements Marshaler.
 		if ident, ok := t.X.(*ast.Ident); ok && ast.IsExported(ident.Name) {
-			return rt("AppendPtrMarshaler") + "(b, " + field + ")"
+			return rt("AppendPtrMarshaler") + "(b, " + field + ")", true
 		}
 
 	case *ast.SelectorExpr:
@@ -1398,18 +1427,18 @@ func encodeExprForField(goName string, typ ast.Expr) string {
 			case "time":
 				switch t.Sel.Name {
 				case "Time":
-					return rt("AppendTime") + "(b, " + field + "), nil"
+					return rt("AppendTime") + "(b, " + field + ")", false
 				case "Duration":
-					return rt("AppendDuration") + "(b, " + field + "), nil"
+					return rt("AppendDuration") + "(b, " + field + ")", false
 				}
 			case "json":
 				if t.Sel.Name == "RawMessage" {
-					return rt("AppendBytes") + "(b, []byte(" + field + ")), nil"
+					return rt("AppendBytes") + "(b, []byte(" + field + "))", false
 				}
 			}
 		}
 	}
 
 	// Fallback: let AppendInterface handle this field.
-	return ""
+	return "", false
 }

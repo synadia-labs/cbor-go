@@ -21,159 +21,126 @@ func (x *ClientInfo) MarshalCBOR(b []byte) ([]byte, error) {
 	b = cbor.Require(b, x.Msgsize())
 
 	count := uint32(0)
-	if !(x.Start == nil) {
+	if x.Start != nil {
 		count++
 	}
-	if !(x.Host == "") {
+	if x.Host != "" {
 		count++
 	}
-	if !(x.ID == 0) {
+	if x.ID != 0 {
 		count++
 	}
-	if !(x.Account == "") {
+	if x.Account != "" {
 		count++
 	}
-	if !(x.Service == "") {
+	if x.Service != "" {
 		count++
 	}
-	if !(x.User == "") {
+	if x.User != "" {
 		count++
 	}
-	if !(x.Name == "") {
+	if x.Name != "" {
 		count++
 	}
-	if !(x.Lang == "") {
+	if x.Lang != "" {
 		count++
 	}
-	if !(x.Version == "") {
+	if x.Version != "" {
 		count++
 	}
-	if !(x.RTT == 0) {
+	if x.RTT != 0 {
 		count++
 	}
-	if !(x.Server == "") {
+	if x.Server != "" {
 		count++
 	}
-	if !(x.Cluster == "") {
+	if x.Cluster != "" {
 		count++
 	}
-	if !(len(x.Alternates) == 0) {
+	if len(x.Alternates) != 0 {
 		count++
 	}
-	if !(x.Stop == nil) {
+	if x.Stop != nil {
 		count++
 	}
-	if !(x.Jwt == "") {
+	if x.Jwt != "" {
 		count++
 	}
-	if !(x.IssuerKey == "") {
+	if x.IssuerKey != "" {
 		count++
 	}
-	if !(x.NameTag == "") {
+	if x.NameTag != "" {
 		count++
 	}
-	if !(len(x.Tags) == 0) {
+	if len(x.Tags) != 0 {
 		count++
 	}
-	if !(x.Kind == "") {
+	if x.Kind != "" {
 		count++
 	}
-	if !(x.ClientType == "") {
+	if x.ClientType != "" {
 		count++
 	}
-	if !(x.MQTTClient == "") {
+	if x.MQTTClient != "" {
 		count++
 	}
-	if !(x.Nonce == "") {
+	if x.Nonce != "" {
 		count++
 	}
 	b = cbor.AppendMapHeader(b, count)
 	var err error
-	if !(x.Start == nil) {
+	if x.Start != nil {
 		b = cbor.AppendString(b, "start")
 		b, err = cbor.AppendInterface(b, x.Start)
 		if err != nil {
 			return b, err
 		}
 	}
-	if !(x.Host == "") {
+	if x.Host != "" {
 		b = cbor.AppendString(b, "host")
-		b, err = cbor.AppendString(b, x.Host), nil
-		if err != nil {
-			return b, err
-		}
+		b = cbor.AppendString(b, x.Host)
 	}
-	if !(x.ID == 0) {
+	if x.ID != 0 {
 		b = cbor.AppendString(b, "id")
-		b, err = cbor.AppendUint64(b, x.ID), nil
-		if err != nil {
-			return b, err
-		}
+		b = cbor.AppendUint64(b, x.ID)
 	}
-	if !(x.Account == "") {
+	if x.Account != "" {
 		b = cbor.AppendString(b, "acc")
-		b, err = cbor.AppendString(b, x.Account), nil
-		if err != nil {
-			return b, err
-		}
+		b = cbor.AppendString(b, x.Account)
 	}
-	if !(x.Service == "") {
+	if x.Service != "" {
 		b = cbor.AppendString(b, "svc")
-		b, err = cbor.AppendString(b, x.Service), nil
-		if err != nil {
-			return b, err
-		}
+		b = cbor.AppendString(b, x.Service)
 	}
-	if !(x.User == "") {
+	if x.User != "" {
 		b = cbor.AppendString(b, "user")
-		b, err = cbor.AppendString(b, x.User), nil
-		if err != nil {
-			return b, err
-		}
+		b = cbor.AppendString(b, x.User)
 	}
-	if !(x.Name == "") {
+	if x.Name != "" {
 		b = cbor.AppendString(b, "name")
-		b, err = cbor.AppendString(b, x.Name), nil
-		if err != nil {
-			return b, err
-		}
+		b = cbor.AppendString(b, x.Name)
 	}
-	if !(x.Lang == "") {
+	if x.Lang != "" {
 		b = cbor.AppendString(b, "lang")
-		b, err = cbor.AppendString(b, x.Lang), nil
-		if err != nil {
-			return b, err
-		}
+		b = cbor.AppendString(b, x.Lang)
 	}
-	if !(x.Version == "") {
+	if x.Version != "" {
 		b = cbor.AppendString(b, "ver")
-		b, err = cbor.AppendString(b, x.Version), nil
-		if err != nil {
-			return b, err
-		}
+		b = cbor.AppendString(b, x.Version)
 	}
-	if !(x.RTT == 0) {
+	if x.RTT != 0 {
 		b = cbor.AppendString(b, "rtt")
-		b, err = cbor.AppendDuration(b, x.RTT), nil
-		if err != nil {
-			return b, err
-		}
+		b = cbor.AppendDuration(b, x.RTT)
 	}
-	if !(x.Server == "") {
+	if x.Server != "" {
 		b = cbor.AppendString(b, "server")
-		b, err = cbor.AppendString(b, x.Server), nil
-		if err != nil {
-			return b, err
-		}
+		b = cbor.AppendString(b, x.Server)
 	}
-	if !(x.Cluster == "") {
+	if x.Cluster != "" {
 		b = cbor.AppendString(b, "cluster")
-		b, err = cbor.AppendString(b, x.Cluster), nil
-		if err != nil {
-			return b, err
-		}
+		b = cbor.AppendString(b, x.Cluster)
 	}
-	if !(len(x.Alternates) == 0) {
+	if len(x.Alternates) != 0 {
 
 		b = cbor.AppendString(b, "alts")
 		b = cbor.AppendArrayHeader(b, uint32(len(x.Alternates)))
@@ -181,35 +148,26 @@ func (x *ClientInfo) MarshalCBOR(b []byte) ([]byte, error) {
 			b = cbor.AppendString(b, v)
 		}
 	}
-	if !(x.Stop == nil) {
+	if x.Stop != nil {
 		b = cbor.AppendString(b, "stop")
 		b, err = cbor.AppendInterface(b, x.Stop)
 		if err != nil {
 			return b, err
 		}
 	}
-	if !(x.Jwt == "") {
+	if x.Jwt != "" {
 		b = cbor.AppendString(b, "jwt")
-		b, err = cbor.AppendString(b, x.Jwt), nil
-		if err != nil {
-			return b, err
-		}
+		b = cbor.AppendString(b, x.Jwt)
 	}
-	if !(x.IssuerKey == "") {
+	if x.IssuerKey != "" {
 		b = cbor.AppendString(b, "issuer_key")
-		b, err = cbor.AppendString(b, x.IssuerKey), nil
-		if err != nil {
-			return b, err
-		}
+		b = cbor.AppendString(b, x.IssuerKey)
 	}
-	if !(x.NameTag == "") {
+	if x.NameTag != "" {
 		b = cbor.AppendString(b, "name_tag")
-		b, err = cbor.AppendString(b, x.NameTag), nil
-		if err != nil {
-			return b, err
-		}
+		b = cbor.AppendString(b, x.NameTag)
 	}
-	if !(len(x.Tags) == 0) {
+	if len(x.Tags) != 0 {
 
 		b = cbor.AppendString(b, "tags")
 		b = cbor.AppendArrayHeader(b, uint32(len(x.Tags)))
@@ -217,33 +175,21 @@ func (x *ClientInfo) MarshalCBOR(b []byte) ([]byte, error) {
 			b = cbor.AppendString(b, v)
 		}
 	}
-	if !(x.Kind == "") {
+	if x.Kind != "" {
 		b = cbor.AppendString(b, "kind")
-		b, err = cbor.AppendString(b, x.Kind), nil
-		if err != nil {
-			return b, err
-		}
+		b = cbor.AppendString(b, x.Kind)
 	}
-	if !(x.ClientType == "") {
+	if x.ClientType != "" {
 		b = cbor.AppendString(b, "client_type")
-		b, err = cbor.AppendString(b, x.ClientType), nil
-		if err != nil {
-			return b, err
-		}
+		b = cbor.AppendString(b, x.ClientType)
 	}
-	if !(x.MQTTClient == "") {
+	if x.MQTTClient != "" {
 		b = cbor.AppendString(b, "client_id")
-		b, err = cbor.AppendString(b, x.MQTTClient), nil
-		if err != nil {
-			return b, err
-		}
+		b = cbor.AppendString(b, x.MQTTClient)
 	}
-	if !(x.Nonce == "") {
+	if x.Nonce != "" {
 		b = cbor.AppendString(b, "nonce")
-		b, err = cbor.AppendString(b, x.Nonce), nil
-		if err != nil {
-			return b, err
-		}
+		b = cbor.AppendString(b, x.Nonce)
 	}
 
 	return b, nil
@@ -723,26 +669,20 @@ func (x *RaftGroup) MarshalCBOR(b []byte) ([]byte, error) {
 
 	b = cbor.Require(b, x.Msgsize())
 
-	count := uint32(0)
-	count++
-	count++
-	count++
-	if !(x.Cluster == "") {
+	count := uint32(3)
+	if x.Cluster != "" {
 		count++
 	}
-	if !(x.Preferred == "") {
+	if x.Preferred != "" {
 		count++
 	}
-	if !(!x.ScaleUp) {
+	if x.ScaleUp {
 		count++
 	}
 	b = cbor.AppendMapHeader(b, count)
 	var err error
 	b = cbor.AppendString(b, "name")
-	b, err = cbor.AppendString(b, x.Name), nil
-	if err != nil {
-		return b, err
-	}
+	b = cbor.AppendString(b, x.Name)
 
 	b = cbor.AppendString(b, "peers")
 	b = cbor.AppendArrayHeader(b, uint32(len(x.Peers)))
@@ -754,26 +694,17 @@ func (x *RaftGroup) MarshalCBOR(b []byte) ([]byte, error) {
 	if err != nil {
 		return b, err
 	}
-	if !(x.Cluster == "") {
+	if x.Cluster != "" {
 		b = cbor.AppendString(b, "cluster")
-		b, err = cbor.AppendString(b, x.Cluster), nil
-		if err != nil {
-			return b, err
-		}
+		b = cbor.AppendString(b, x.Cluster)
 	}
-	if !(x.Preferred == "") {
+	if x.Preferred != "" {
 		b = cbor.AppendString(b, "preferred")
-		b, err = cbor.AppendString(b, x.Preferred), nil
-		if err != nil {
-			return b, err
-		}
+		b = cbor.AppendString(b, x.Preferred)
 	}
-	if !(!x.ScaleUp) {
+	if x.ScaleUp {
 		b = cbor.AppendString(b, "scale_up")
-		b, err = cbor.AppendBool(b, x.ScaleUp), nil
-		if err != nil {
-			return b, err
-		}
+		b = cbor.AppendBool(b, x.ScaleUp)
 	}
 
 	return b, nil
@@ -972,17 +903,10 @@ func (x *SequencePair) MarshalCBOR(b []byte) ([]byte, error) {
 	b = cbor.Require(b, x.Msgsize())
 
 	b = cbor.AppendMapHeader(b, uint32(2))
-	var err error
 	b = cbor.AppendString(b, "consumer_seq")
-	b, err = cbor.AppendUint64(b, x.Consumer), nil
-	if err != nil {
-		return b, err
-	}
+	b = cbor.AppendUint64(b, x.Consumer)
 	b = cbor.AppendString(b, "stream_seq")
-	b, err = cbor.AppendUint64(b, x.Stream), nil
-	if err != nil {
-		return b, err
-	}
+	b = cbor.AppendUint64(b, x.Stream)
 
 	return b, nil
 }
@@ -1090,17 +1014,10 @@ func (x *Pending) MarshalCBOR(b []byte) ([]byte, error) {
 	b = cbor.Require(b, x.Msgsize())
 
 	b = cbor.AppendMapHeader(b, uint32(2))
-	var err error
 	b = cbor.AppendString(b, "sequence")
-	b, err = cbor.AppendUint64(b, x.Sequence), nil
-	if err != nil {
-		return b, err
-	}
+	b = cbor.AppendUint64(b, x.Sequence)
 	b = cbor.AppendString(b, "ts")
-	b, err = cbor.AppendInt64(b, x.Timestamp), nil
-	if err != nil {
-		return b, err
-	}
+	b = cbor.AppendInt64(b, x.Timestamp)
 
 	return b, nil
 }
@@ -1200,13 +1117,11 @@ func (x *ConsumerState) MarshalCBOR(b []byte) ([]byte, error) {
 		return cbor.AppendNil(b), nil
 	}
 
-	count := uint32(0)
-	count++
-	count++
-	if !(len(x.Pending) == 0) {
+	count := uint32(2)
+	if len(x.Pending) != 0 {
 		count++
 	}
-	if !(len(x.Redelivered) == 0) {
+	if len(x.Redelivered) != 0 {
 		count++
 	}
 	b = cbor.AppendMapHeader(b, count)
@@ -1221,7 +1136,7 @@ func (x *ConsumerState) MarshalCBOR(b []byte) ([]byte, error) {
 	if err != nil {
 		return b, err
 	}
-	if !(len(x.Pending) == 0) {
+	if len(x.Pending) != 0 {
 
 		b = cbor.AppendString(b, "pending")
 		b = cbor.AppendMapHeader(b, uint32(len(x.Pending)))
@@ -1237,7 +1152,7 @@ func (x *ConsumerState) MarshalCBOR(b []byte) ([]byte, error) {
 			}
 		}
 	}
-	if !(len(x.Redelivered) == 0) {
+	if len(x.Redelivered) != 0 {
 
 		b = cbor.AppendString(b, "redelivered")
 		b = cbor.AppendMapHeader(b, uint32(len(x.Redelivered)))
@@ -1466,21 +1381,16 @@ func (x *consumerAssignment) MarshalCBOR(b []byte) ([]byte, error) {
 
 	b = cbor.Require(b, x.Msgsize())
 
-	count := uint32(0)
-	if !(x.Client == nil) {
+	count := uint32(5)
+	if x.Client != nil {
 		count++
 	}
-	count++
-	count++
-	count++
-	count++
-	count++
-	if !(x.State == nil) {
+	if x.State != nil {
 		count++
 	}
 	b = cbor.AppendMapHeader(b, count)
 	var err error
-	if !(x.Client == nil) {
+	if x.Client != nil {
 		b = cbor.AppendString(b, "client")
 		b, err = cbor.AppendPtrMarshaler(b, x.Client)
 		if err != nil {
@@ -1488,31 +1398,19 @@ func (x *consumerAssignment) MarshalCBOR(b []byte) ([]byte, error) {
 		}
 	}
 	b = cbor.AppendString(b, "created")
-	b, err = cbor.AppendTime(b, x.Created), nil
-	if err != nil {
-		return b, err
-	}
+	b = cbor.AppendTime(b, x.Created)
 	b = cbor.AppendString(b, "name")
-	b, err = cbor.AppendString(b, x.Name), nil
-	if err != nil {
-		return b, err
-	}
+	b = cbor.AppendString(b, x.Name)
 	b = cbor.AppendString(b, "stream")
-	b, err = cbor.AppendString(b, x.Stream), nil
-	if err != nil {
-		return b, err
-	}
+	b = cbor.AppendString(b, x.Stream)
 	b = cbor.AppendString(b, "consumer")
-	b, err = cbor.AppendBytes(b, []byte(x.ConfigJSON)), nil
-	if err != nil {
-		return b, err
-	}
+	b = cbor.AppendBytes(b, []byte(x.ConfigJSON))
 	b = cbor.AppendString(b, "group")
 	b, err = cbor.AppendPtrMarshaler(b, x.Group)
 	if err != nil {
 		return b, err
 	}
-	if !(x.State == nil) {
+	if x.State != nil {
 		b = cbor.AppendString(b, "state")
 		b, err = cbor.AppendPtrMarshaler(b, x.State)
 		if err != nil {
@@ -1707,17 +1605,13 @@ func (x *streamAssignment) MarshalCBOR(b []byte) ([]byte, error) {
 
 	b = cbor.Require(b, x.Msgsize())
 
-	count := uint32(0)
-	if !(x.Client == nil) {
+	count := uint32(4)
+	if x.Client != nil {
 		count++
 	}
-	count++
-	count++
-	count++
-	count++
 	b = cbor.AppendMapHeader(b, count)
 	var err error
-	if !(x.Client == nil) {
+	if x.Client != nil {
 		b = cbor.AppendString(b, "client")
 		b, err = cbor.AppendPtrMarshaler(b, x.Client)
 		if err != nil {
@@ -1725,25 +1619,16 @@ func (x *streamAssignment) MarshalCBOR(b []byte) ([]byte, error) {
 		}
 	}
 	b = cbor.AppendString(b, "created")
-	b, err = cbor.AppendTime(b, x.Created), nil
-	if err != nil {
-		return b, err
-	}
+	b = cbor.AppendTime(b, x.Created)
 	b = cbor.AppendString(b, "stream")
-	b, err = cbor.AppendBytes(b, []byte(x.ConfigJSON)), nil
-	if err != nil {
-		return b, err
-	}
+	b = cbor.AppendBytes(b, []byte(x.ConfigJSON))
 	b = cbor.AppendString(b, "group")
 	b, err = cbor.AppendPtrMarshaler(b, x.Group)
 	if err != nil {
 		return b, err
 	}
 	b = cbor.AppendString(b, "sync")
-	b, err = cbor.AppendString(b, x.Sync), nil
-	if err != nil {
-		return b, err
-	}
+	b = cbor.AppendString(b, x.Sync)
 
 	return b, nil
 }
@@ -1898,21 +1783,16 @@ func (x *WriteableConsumerAssignment) MarshalCBOR(b []byte) ([]byte, error) {
 
 	b = cbor.Require(b, x.Msgsize())
 
-	count := uint32(0)
-	if !(x.Client == nil) {
+	count := uint32(5)
+	if x.Client != nil {
 		count++
 	}
-	count++
-	count++
-	count++
-	count++
-	count++
-	if !(x.State == nil) {
+	if x.State != nil {
 		count++
 	}
 	b = cbor.AppendMapHeader(b, count)
 	var err error
-	if !(x.Client == nil) {
+	if x.Client != nil {
 		b = cbor.AppendString(b, "client")
 		b, err = cbor.AppendPtrMarshaler(b, x.Client)
 		if err != nil {
@@ -1920,31 +1800,19 @@ func (x *WriteableConsumerAssignment) MarshalCBOR(b []byte) ([]byte, error) {
 		}
 	}
 	b = cbor.AppendString(b, "created")
-	b, err = cbor.AppendTime(b, x.Created), nil
-	if err != nil {
-		return b, err
-	}
+	b = cbor.AppendTime(b, x.Created)
 	b = cbor.AppendString(b, "name")
-	b, err = cbor.AppendString(b, x.Name), nil
-	if err != nil {
-		return b, err
-	}
+	b = cbor.AppendString(b, x.Name)
 	b = cbor.AppendString(b, "stream")
-	b, err = cbor.AppendString(b, x.Stream), nil
-	if err != nil {
-		return b, err
-	}
+	b = cbor.AppendString(b, x.Stream)
 	b = cbor.AppendString(b, "consumer")
-	b, err = cbor.AppendBytes(b, []byte(x.ConfigJSON)), nil
-	if err != nil {
-		return b, err
-	}
+	b = cbor.AppendBytes(b, []byte(x.ConfigJSON))
 	b = cbor.AppendString(b, "group")
 	b, err = cbor.AppendPtrMarshaler(b, x.Group)
 	if err != nil {
 		return b, err
 	}
-	if !(x.State == nil) {
+	if x.State != nil {
 		b = cbor.AppendString(b, "state")
 		b, err = cbor.AppendPtrMarshaler(b, x.State)
 		if err != nil {
@@ -2139,20 +2007,16 @@ func (x *WriteableStreamAssignment) MarshalCBOR(b []byte) ([]byte, error) {
 
 	b = cbor.Require(b, x.Msgsize())
 
-	count := uint32(0)
-	if !(x.Client == nil) {
+	count := uint32(4)
+	if x.Client != nil {
 		count++
 	}
-	count++
-	count++
-	count++
-	count++
-	if !(len(x.Consumers) == 0) {
+	if len(x.Consumers) != 0 {
 		count++
 	}
 	b = cbor.AppendMapHeader(b, count)
 	var err error
-	if !(x.Client == nil) {
+	if x.Client != nil {
 		b = cbor.AppendString(b, "client")
 		b, err = cbor.AppendPtrMarshaler(b, x.Client)
 		if err != nil {
@@ -2160,26 +2024,17 @@ func (x *WriteableStreamAssignment) MarshalCBOR(b []byte) ([]byte, error) {
 		}
 	}
 	b = cbor.AppendString(b, "created")
-	b, err = cbor.AppendTime(b, x.Created), nil
-	if err != nil {
-		return b, err
-	}
+	b = cbor.AppendTime(b, x.Created)
 	b = cbor.AppendString(b, "stream")
-	b, err = cbor.AppendBytes(b, []byte(x.ConfigJSON)), nil
-	if err != nil {
-		return b, err
-	}
+	b = cbor.AppendBytes(b, []byte(x.ConfigJSON))
 	b = cbor.AppendString(b, "group")
 	b, err = cbor.AppendPtrMarshaler(b, x.Group)
 	if err != nil {
 		return b, err
 	}
 	b = cbor.AppendString(b, "sync")
-	b, err = cbor.AppendString(b, x.Sync), nil
-	if err != nil {
-		return b, err
-	}
-	if !(len(x.Consumers) == 0) {
+	b = cbor.AppendString(b, x.Sync)
+	if len(x.Consumers) != 0 {
 
 		b = cbor.AppendString(b, "consumers")
 		b = cbor.AppendArrayHeader(b, uint32(len(x.Consumers)))
@@ -2527,20 +2382,14 @@ func (x *StreamConfigSnapshot) MarshalCBOR(b []byte) ([]byte, error) {
 
 	b = cbor.Require(b, x.Msgsize())
 
-	count := uint32(0)
-	count++
-	count++
-	count++
-	if !(len(x.Metadata) == 0) {
+	count := uint32(3)
+	if len(x.Metadata) != 0 {
 		count++
 	}
 	b = cbor.AppendMapHeader(b, count)
 	var err error
 	b = cbor.AppendString(b, "name")
-	b, err = cbor.AppendString(b, x.Name), nil
-	if err != nil {
-		return b, err
-	}
+	b = cbor.AppendString(b, x.Name)
 
 	b = cbor.AppendString(b, "subjects")
 	b = cbor.AppendArrayHeader(b, uint32(len(x.Subjects)))
@@ -2552,7 +2401,7 @@ func (x *StreamConfigSnapshot) MarshalCBOR(b []byte) ([]byte, error) {
 	if err != nil {
 		return b, err
 	}
-	if !(len(x.Metadata) == 0) {
+	if len(x.Metadata) != 0 {
 
 		b = cbor.AppendString(b, "metadata")
 		b = cbor.AppendMapHeader(b, uint32(len(x.Metadata)))
@@ -2759,25 +2608,16 @@ func (x *ConsumerConfigSnapshot) MarshalCBOR(b []byte) ([]byte, error) {
 
 	b = cbor.Require(b, x.Msgsize())
 
-	count := uint32(0)
-	count++
-	count++
-	if !(len(x.Metadata) == 0) {
+	count := uint32(2)
+	if len(x.Metadata) != 0 {
 		count++
 	}
 	b = cbor.AppendMapHeader(b, count)
-	var err error
 	b = cbor.AppendString(b, "durable")
-	b, err = cbor.AppendString(b, x.Durable), nil
-	if err != nil {
-		return b, err
-	}
+	b = cbor.AppendString(b, x.Durable)
 	b = cbor.AppendString(b, "mem_storage")
-	b, err = cbor.AppendBool(b, x.MemoryStorage), nil
-	if err != nil {
-		return b, err
-	}
-	if !(len(x.Metadata) == 0) {
+	b = cbor.AppendBool(b, x.MemoryStorage)
+	if len(x.Metadata) != 0 {
 
 		b = cbor.AppendString(b, "metadata")
 		b = cbor.AppendMapHeader(b, uint32(len(x.Metadata)))
