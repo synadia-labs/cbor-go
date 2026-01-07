@@ -1,0 +1,1415 @@
+package core
+
+import (
+	"bytes"
+	"fmt"
+	"go/ast"
+	"go/format"
+	"go/parser"
+	"go/token"
+	"os"
+	"path/filepath"
+	"reflect"
+	"strings"
+	"text/template"
+
+	"golang.org/x/tools/imports"
+
+	tmplfs "github.com/synadia-labs/cbor-go/cborgen/templates"
+)
+
+// generatedStructs tracks struct types for which cborgen is generating
+// MarshalCBOR/Decode* methods in the current run. It is used to decide
+// when DecodeTrusted can be used for nested fields instead of falling
+// back to the generic UnmarshalCBOR path.
+var generatedStructs = map[string]struct{}{}
+
+const runtimeAlias = "cbor"
+
+var templateFuncs = template.FuncMap{
+	"rt": runtimeName,
+}
+
+func runtimeName(name string) string {
+	return runtimeAlias + "." + name
+}
+
+// Options configures how generation runs.
+// Additional switches can be added over time.
+type Options struct {
+	Verbose bool
+	// Structs, if non-empty, restricts generation to the
+	// named struct types. Names must match Go type names
+	// exactly (no package qualification).
+	Structs []string
+}
+
+// Run generates CBOR code for a single Go source file.
+// It emits per-struct encode/decode implementations into outputPath.
+func Run(inputPath, outputPath string, opts Options) error {
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, inputPath, nil, parser.ParseComments)
+	if err != nil {
+		return err
+	}
+
+	pkg := file.Name.Name
+
+	return generateStructCode(fset, file, outputPath, pkg, opts)
+}
+
+type fieldSpec struct {
+	GoName          string
+	CBORName        string
+	OmitEmpty       bool
+	ZeroCheck       string
+	DecodeCaseSafe  string
+	DecodeCaseTrust string
+	EncodeCase      string
+	EncodeExpr      string
+	EncodeBlock     string
+	Ignore          bool
+}
+
+type structSpec struct {
+	Name        string
+	Fields      []fieldSpec
+	MsgSizeExpr string
+	HasOmit     bool
+}
+
+// generateStructCode finds struct types in the given file and generates
+// simple MarshalCBOR methods for each, honoring cbor/json tags.
+//
+// cbor tag rules:
+//   - if cbor tag present: it wins
+//   - if cbor tag absent, json tag is used
+//   - if both absent, Go field name is used
+func generateStructCode(fset *token.FileSet, file *ast.File, outputPath, pkg string, opts Options) error {
+	var structs []structSpec
+	useOmit := false
+
+	var allowed map[string]struct{}
+	if len(opts.Structs) > 0 {
+		allowed = make(map[string]struct{}, len(opts.Structs))
+		for _, name := range opts.Structs {
+			name = strings.TrimSpace(name)
+			if name == "" {
+				continue
+			}
+			allowed[name] = struct{}{}
+		}
+	}
+
+	for _, decl := range file.Decls {
+		gd, ok := decl.(*ast.GenDecl)
+		if !ok || gd.Tok != token.TYPE {
+			continue
+		}
+		for _, spec := range gd.Specs {
+			ts, ok := spec.(*ast.TypeSpec)
+			if !ok {
+				continue
+			}
+			st, ok := ts.Type.(*ast.StructType)
+			if !ok {
+				continue
+			}
+			// If a struct allowlist is provided, skip
+			// types that are not explicitly listed.
+			if len(allowed) > 0 {
+				if _, ok := allowed[ts.Name.Name]; !ok {
+					continue
+				}
+			}
+			ss := structSpec{Name: ts.Name.Name}
+			var sizeExprParts []string
+			for _, field := range st.Fields.List {
+				// Skip anonymous fields for now.
+				if len(field.Names) == 0 {
+					continue
+				}
+				name := field.Names[0].Name
+				// Only exported fields participate by default.
+				if !ast.IsExported(name) {
+					continue
+				}
+				fs := resolveFieldSpec(name, field.Tag)
+				if fs.Ignore {
+					continue
+				}
+				if fs.OmitEmpty {
+					if z, ok := zeroCheckExpr(name, field.Type); ok {
+						fs.ZeroCheck = z
+						useOmit = true
+						ss.HasOmit = true
+					} else {
+						fs.OmitEmpty = false
+					}
+				}
+				// Accumulate contribution to Msgsize expression where supported.
+				if szExpr, ok := fieldSizeExpr(fs.CBORName, fs.GoName, field.Type); ok {
+					sizeExprParts = append(sizeExprParts, szExpr)
+				}
+				if ec, ok := encodeCaseExpr(fs.GoName, field.Type); ok {
+					fs.EncodeCase = ec
+				}
+				fs.EncodeExpr = encodeExprForField(fs.GoName, field.Type)
+				fs.EncodeBlock = encodeBlockForField(ss.Name, fs.GoName, fs.CBORName, field.Type)
+				if dc, ok := decodeCaseExprSafe(ss.Name, fs.GoName, field.Type); ok {
+					fs.DecodeCaseSafe = dc
+				} else {
+					// Fallback: skip the value for unsupported types using template.
+					var skipBuf bytes.Buffer
+					if err := decodeCaseTemplate.ExecuteTemplate(&skipBuf, "decodeCaseSkip", decodeCaseTemplateData{}); err == nil {
+						fs.DecodeCaseSafe = strings.TrimRight(skipBuf.String(), "\n")
+					}
+				}
+
+				if dc, ok := decodeCaseExprTrusted(ss.Name, fs.GoName, field.Type); ok {
+					fs.DecodeCaseTrust = dc
+				} else {
+					var skipBuf bytes.Buffer
+					if err := decodeCaseTemplate.ExecuteTemplate(&skipBuf, "decodeCaseSkip", decodeCaseTemplateData{}); err == nil {
+						fs.DecodeCaseTrust = strings.TrimRight(skipBuf.String(), "\n")
+					}
+				}
+				ss.Fields = append(ss.Fields, fs)
+			}
+			if len(ss.Fields) > 0 {
+				generatedStructs[ss.Name] = struct{}{}
+				if len(sizeExprParts) > 0 {
+					// Map header plus per-field key/value contributions.
+					ss.MsgSizeExpr = runtimeName("MapHeaderSize") + " + " + strings.Join(sizeExprParts, " + ")
+				}
+				structs = append(structs, ss)
+			}
+		}
+	}
+
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
+		return err
+	}
+
+	out, err := os.Create(outputPath)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	data := struct {
+		Package string
+		UseOmit bool
+		Structs []structSpec
+	}{
+		Package: pkg,
+		UseOmit: useOmit,
+		Structs: structs,
+	}
+
+	var buf bytes.Buffer
+	if err := marshalTemplate.ExecuteTemplate(&buf, "marshal.go.tpl", data); err != nil {
+		return err
+	}
+
+	src, err := imports.Process(outputPath, buf.Bytes(), nil)
+	if err != nil {
+		// Fall back to go/format if goimports fails.
+		if formatted, ferr := format.Source(buf.Bytes()); ferr == nil {
+			src = formatted
+		} else {
+			src = buf.Bytes()
+		}
+	}
+
+	_, err = out.Write(src)
+	return err
+}
+
+// resolveFieldSpec applies tag resolution rules:
+// - cbor tag primary
+// - if no cbor tag, use json tag
+// - if both absent, use Go field name
+func resolveFieldSpec(goName string, tag *ast.BasicLit) fieldSpec {
+	fs := fieldSpec{GoName: goName, CBORName: goName}
+	if tag == nil {
+		return fs
+	}
+	raw := tag.Value
+	if len(raw) >= 2 && (raw[0] == '`' && raw[len(raw)-1] == '`') {
+		raw = raw[1 : len(raw)-1]
+	}
+	st := reflect.StructTag(raw)
+	if v, ok := parseTag(st.Get("cbor")); ok {
+		if v == "-" {
+			fs.Ignore = true
+			return fs
+		}
+		fs.CBORName, fs.OmitEmpty = splitNameOptions(v)
+		return fs
+	}
+	if v, ok := parseTag(st.Get("json")); ok {
+		if v == "-" {
+			fs.Ignore = true
+			return fs
+		}
+		fs.CBORName, fs.OmitEmpty = splitNameOptions(v)
+		return fs
+	}
+	return fs
+}
+
+// parseTag returns the raw tag string and whether it was present.
+func parseTag(v string) (string, bool) {
+	if v == "" {
+		return "", false
+	}
+	return v, true
+}
+
+// splitNameOptions splits a tag like "name,omitempty" into name and omitEmpty flag.
+func splitNameOptions(tag string) (string, bool) {
+	parts := strings.Split(tag, ",")
+	name := parts[0]
+	omit := false
+	for _, p := range parts[1:] {
+		if p == "omitempty" {
+			omit = true
+		}
+	}
+	if name == "" {
+		name = "-"
+	}
+	return name, omit
+}
+
+type zeroCheckTemplateData struct {
+	Receiver string
+	Field    string
+	Kind     string
+}
+
+var zeroCheckTemplate = template.Must(template.New("zero_check").Funcs(templateFuncs).ParseFS(tmplfs.FS, "zero_check.go.tpl"))
+
+type decodeCaseTemplateData struct {
+	Field    string
+	VarType  string
+	ReadFunc string
+}
+
+var decodeCaseTemplate = template.Must(template.New("decode_case").Funcs(templateFuncs).ParseFS(tmplfs.FS, "decode_case.go.tpl"))
+
+type encodeBlockTemplateData struct {
+	StructName string
+	GoField    string
+	CBORName   string
+	FieldRef   string
+	KeyName    string
+	ElemVar    string
+	AppendFunc string
+}
+
+var encodeBlockTemplate = template.Must(template.New("encode_block").Funcs(templateFuncs).ParseFS(tmplfs.FS, "encode_block.go.tpl"))
+
+// fieldSizeExpr builds a worst-case size expression for a single field
+// with the given CBOR name and Go field name. The returned expression
+// is written in terms of receiver 'x'. It returns ok=false if the type
+// is not supported for Msgsize.
+func fieldSizeExpr(cborName, goName string, typ ast.Expr) (expr string, ok bool) {
+	rt := runtimeName
+	key := fmt.Sprintf("%s + len(%q)", rt("StringPrefixSize"), cborName)
+	fieldRef := "x." + goName
+	val := ""
+
+	switch t := typ.(type) {
+	case *ast.Ident:
+		switch t.Name {
+		case "string":
+			val = rt("StringPrefixSize") + " + len(" + fieldRef + ")"
+		case "bool":
+			val = rt("BoolSize")
+		case "int":
+			val = rt("IntSize")
+		case "int64":
+			val = rt("Int64Size")
+		case "int32", "rune":
+			val = rt("Int32Size")
+		case "int16":
+			val = rt("Int16Size")
+		case "int8":
+			val = rt("Int8Size")
+		case "uint":
+			val = rt("UintSize")
+		case "uint64":
+			val = rt("Uint64Size")
+		case "uint32":
+			val = rt("Uint32Size")
+		case "uint16":
+			val = rt("Uint16Size")
+		case "uint8", "byte":
+			val = rt("Uint8Size")
+		case "float32":
+			val = rt("Float32Size")
+		case "float64":
+			val = rt("Float64Size")
+		default:
+			return "", false
+		}
+	case *ast.SelectorExpr:
+		// Support common time-based primitives.
+		switch t.Sel.Name {
+		case "Time":
+			val = rt("TimeSize")
+		case "Duration":
+			val = rt("DurationSize")
+		default:
+			return "", false
+		}
+	case *ast.ArrayType:
+		ident, ok := t.Elt.(*ast.Ident)
+		if !ok || t.Len != nil {
+			return "", false
+		}
+		// []byte: use bytes prefix + len(slice)
+		if ident.Name == "byte" {
+			val = rt("BytesPrefixSize") + " + len(" + fieldRef + ")"
+		} else {
+			// Other supported scalar slices: approximate as header + len(slice)*elemSize.
+			var elem string
+			switch ident.Name {
+			case "string":
+				// Prefix per element; data length is accounted for elsewhere at runtime.
+				elem = rt("StringPrefixSize")
+			case "bool":
+				elem = rt("BoolSize")
+			case "int":
+				elem = rt("IntSize")
+			case "int64":
+				elem = rt("Int64Size")
+			case "int32", "rune":
+				elem = rt("Int32Size")
+			case "int16":
+				elem = rt("Int16Size")
+			case "int8":
+				elem = rt("Int8Size")
+			case "uint":
+				elem = rt("UintSize")
+			case "uint64":
+				elem = rt("Uint64Size")
+			case "uint32":
+				elem = rt("Uint32Size")
+			case "uint16":
+				elem = rt("Uint16Size")
+			case "uint8", "byte":
+				elem = rt("Uint8Size")
+			case "float32":
+				elem = rt("Float32Size")
+			case "float64":
+				elem = rt("Float64Size")
+			default:
+				// Unknown element types are not sized.
+				elem = "0"
+			}
+			val = rt("ArrayHeaderSize") + " + len(" + fieldRef + ")*" + elem
+		}
+	case *ast.MapType:
+		// map[string]T: approximate as header plus per-entry constant.
+		keyIdent, okKey := t.Key.(*ast.Ident)
+		valIdent, okVal := t.Value.(*ast.Ident)
+		if !okKey || !okVal || keyIdent.Name != "string" {
+			return "", false
+		}
+		var elem string
+		switch valIdent.Name {
+		case "string":
+			// Prefix for the value; data length is accounted for elsewhere at runtime.
+			elem = rt("StringPrefixSize")
+		case "bool":
+			elem = rt("BoolSize")
+		case "int":
+			elem = rt("IntSize")
+		case "int64":
+			elem = rt("Int64Size")
+		case "int32", "rune":
+			elem = rt("Int32Size")
+		case "int16":
+			elem = rt("Int16Size")
+		case "int8":
+			elem = rt("Int8Size")
+		case "uint":
+			elem = rt("UintSize")
+		case "uint64":
+			elem = rt("Uint64Size")
+		case "uint32":
+			elem = rt("Uint32Size")
+		case "uint16":
+			elem = rt("Uint16Size")
+		case "uint8", "byte":
+			elem = rt("Uint8Size")
+		case "float32":
+			elem = rt("Float32Size")
+		case "float64":
+			elem = rt("Float64Size")
+		default:
+			// Fallback: only header + key prefix per entry.
+			elem = "0"
+		}
+		val = rt("MapHeaderSize") + " + len(" + fieldRef + ")*(" + rt("StringPrefixSize") + " + " + elem + ")"
+	default:
+		return "", false
+	}
+
+	if val == "" {
+		return "", false
+	}
+	return key + " + " + val, true
+}
+
+// encodeBlockForField builds a multi-statement encode block for
+// selected map and slice shapes that are hot in JetStream meta
+// snapshot structs. It returns an empty string when no special
+// handling is required. The block is written in terms of receiver 'x'
+// and appends to the buffer 'b', following the MarshalCBOR template
+// style.
+func encodeBlockForField(structName, goName, cborName string, typ ast.Expr) string {
+	data := encodeBlockTemplateData{
+		StructName: structName,
+		GoField:    goName,
+		CBORName:   cborName,
+		FieldRef:   "x." + goName,
+		KeyName:    cborName,
+	}
+
+	rt := runtimeName
+	tmplName := ""
+
+	switch t := typ.(type) {
+	case *ast.MapType:
+		keyIdent, okKey := t.Key.(*ast.Ident)
+		if !okKey {
+			return ""
+		}
+
+		// map[uint64]*T where *T has MarshalCBOR (assumed for exported T).
+		if keyIdent.Name == "uint64" {
+			if starVal, ok := t.Value.(*ast.StarExpr); ok {
+				if ident, ok := starVal.X.(*ast.Ident); ok && ast.IsExported(ident.Name) {
+					tmplName = "encodeMapUint64PtrMarshaler"
+				}
+			} else if valIdent, ok := t.Value.(*ast.Ident); ok && valIdent.Name == "uint64" {
+				// map[uint64]uint64
+				tmplName = "encodeMapUint64Uint64"
+			}
+		}
+
+		// map[string]T shapes.
+		if tmplName == "" && keyIdent.Name == "string" {
+			// map[string]S for scalar S, map[string]string, and map[string]T where T has MarshalCBOR.
+			if valIdent, ok := t.Value.(*ast.Ident); ok {
+				switch valIdent.Name {
+				case "string":
+					// Dedicated helper for map[string]string.
+					tmplName = "encodeMapStrStr"
+				case "bool":
+					data.AppendFunc = rt("AppendBool")
+				case "int":
+					data.AppendFunc = rt("AppendInt")
+				case "int8":
+					data.AppendFunc = rt("AppendInt8")
+				case "int16":
+					data.AppendFunc = rt("AppendInt16")
+				case "int32", "rune":
+					data.AppendFunc = rt("AppendInt32")
+				case "int64":
+					data.AppendFunc = rt("AppendInt64")
+				case "uint":
+					data.AppendFunc = rt("AppendUint")
+				case "uint8", "byte":
+					data.AppendFunc = rt("AppendUint8")
+				case "uint16":
+					data.AppendFunc = rt("AppendUint16")
+				case "uint32":
+					data.AppendFunc = rt("AppendUint32")
+				case "uint64":
+					data.AppendFunc = rt("AppendUint64")
+				case "float32":
+					data.AppendFunc = rt("AppendFloat32")
+				case "float64":
+					data.AppendFunc = rt("AppendFloat64")
+				}
+				if data.AppendFunc != "" && tmplName == "" {
+					tmplName = "encodeMapStrScalar"
+				} else if tmplName == "" && ast.IsExported(valIdent.Name) {
+					// map[string]T where T has MarshalCBOR
+					tmplName = "encodeMapStrValueMarshaler"
+				}
+			} else if starVal, ok := t.Value.(*ast.StarExpr); ok {
+				// map[string]*T where *T has MarshalCBOR
+				if ident, ok := starVal.X.(*ast.Ident); ok && ast.IsExported(ident.Name) {
+					tmplName = "encodeMapStrPtrMarshaler"
+				}
+			}
+		}
+
+	case *ast.ArrayType:
+		if t.Len != nil {
+			return ""
+		}
+
+		// Scalar slices: []bool, []int*, []uint*, []float*, []string.
+		if ident, ok := t.Elt.(*ast.Ident); ok {
+			// []byte is encoded as a CBOR byte string, not an array.
+			if ident.Name == "byte" {
+				break
+			}
+			switch ident.Name {
+			case "string":
+				data.AppendFunc = rt("AppendString")
+			case "bool":
+				data.AppendFunc = rt("AppendBool")
+			case "int":
+				data.AppendFunc = rt("AppendInt")
+			case "int8":
+				data.AppendFunc = rt("AppendInt8")
+			case "int16":
+				data.AppendFunc = rt("AppendInt16")
+			case "int32", "rune":
+				data.AppendFunc = rt("AppendInt32")
+			case "int64":
+				data.AppendFunc = rt("AppendInt64")
+			case "uint":
+				data.AppendFunc = rt("AppendUint")
+			case "uint8", "byte":
+				data.AppendFunc = rt("AppendUint8")
+			case "uint16":
+				data.AppendFunc = rt("AppendUint16")
+			case "uint32":
+				data.AppendFunc = rt("AppendUint32")
+			case "uint64":
+				data.AppendFunc = rt("AppendUint64")
+			case "float32":
+				data.AppendFunc = rt("AppendFloat32")
+			case "float64":
+				data.AppendFunc = rt("AppendFloat64")
+			}
+			if data.AppendFunc != "" {
+				tmplName = "encodeSliceScalar"
+				break
+			}
+		}
+
+		// []*T where *T has MarshalCBOR (assumed for exported T).
+		if star, ok := t.Elt.(*ast.StarExpr); ok {
+			if ident, ok := star.X.(*ast.Ident); ok && ast.IsExported(ident.Name) {
+				data.ElemVar = strings.ToLower(string(ident.Name[0]))
+				tmplName = "encodeSlicePtrMarshaler"
+			}
+		} else if ident, ok := t.Elt.(*ast.Ident); ok && ast.IsExported(ident.Name) {
+			// []T where T has MarshalCBOR.
+			tmplName = "encodeSliceValueMarshaler"
+		}
+	}
+
+	if tmplName == "" {
+		return ""
+	}
+
+	var buf bytes.Buffer
+	if err := encodeBlockTemplate.ExecuteTemplate(&buf, tmplName, data); err != nil {
+		return ""
+	}
+	return strings.TrimRight(buf.String(), "\n")
+}
+
+// encodeCaseExpr builds the body of an EncodeMsg field write for the
+// given Go field name and type, using a *cbor.Writer named 'w'.
+func encodeCaseExpr(goName string, typ ast.Expr) (string, bool) {
+	field := "x." + goName
+	switch t := typ.(type) {
+	case *ast.Ident:
+		switch t.Name {
+		case "string":
+			return "if err := w.WriteString(" + field + "); err != nil { return err }", true
+		case "bool":
+			return "if err := w.WriteBool(" + field + "); err != nil { return err }", true
+		case "int":
+			return "if err := w.WriteInt(" + field + "); err != nil { return err }", true
+		case "int64":
+			return "if err := w.WriteInt64(int64(" + field + ")); err != nil { return err }", true
+		case "int32", "int16", "int8", "rune":
+			return "if err := w.WriteInt64(int64(" + field + ")); err != nil { return err }", true
+		case "uint":
+			return "if err := w.WriteUint(uint(" + field + ")); err != nil { return err }", true
+		case "uint64", "uint32", "uint16", "uint8", "byte":
+			return "if err := w.WriteUint64(uint64(" + field + ")); err != nil { return err }", true
+		case "float32":
+			return "if err := w.WriteFloat32(float32(" + field + ")); err != nil { return err }", true
+		case "float64":
+			return "if err := w.WriteFloat64(float64(" + field + ")); err != nil { return err }", true
+		default:
+			return "", false
+		}
+	case *ast.ArrayType:
+		// []byte
+		if ident, ok := t.Elt.(*ast.Ident); ok && ident.Name == "byte" && t.Len == nil {
+			return "if err := w.WriteBytes(" + field + "); err != nil { return err }", true
+		}
+	}
+	return "", false
+}
+
+// zeroCheckExpr builds a zero-check expression for a field of the given
+// Go name and type. The expression is written in terms of receiver 'x'.
+// Returns ok=false if the type is not supported for omitempty.
+func zeroCheckExpr(goName string, typ ast.Expr) (expr string, ok bool) {
+	data := zeroCheckTemplateData{
+		Receiver: "x",
+		Field:    goName,
+	}
+
+	switch t := typ.(type) {
+	case *ast.Ident:
+		switch t.Name {
+		case "string":
+			data.Kind = "string"
+		case "bool":
+			data.Kind = "bool"
+		case "int", "int8", "int16", "int32", "int64",
+			"uint", "uint8", "uint16", "uint32", "uint64",
+			"float32", "float64",
+			"byte", "rune":
+			data.Kind = "numeric"
+		default:
+			return "", false
+		}
+	case *ast.SelectorExpr:
+		// Handle common time-based types used in structs.
+		switch t.Sel.Name {
+		case "Time":
+			data.Kind = "time"
+		case "Duration":
+			data.Kind = "numeric"
+		default:
+			return "", false
+		}
+	case *ast.StarExpr, *ast.InterfaceType:
+		data.Kind = "ptrOrInterface"
+	case *ast.ArrayType:
+		// Only treat slices (Len == nil) as omitempty-capable.
+		if t.Len == nil {
+			data.Kind = "slice"
+		} else {
+			return "", false
+		}
+	case *ast.MapType:
+		data.Kind = "map"
+	default:
+		return "", false
+	}
+
+	var buf bytes.Buffer
+	if err := zeroCheckTemplate.ExecuteTemplate(&buf, "zeroCheck", data); err != nil {
+		return "", false
+	}
+	expr = strings.TrimSpace(buf.String())
+	if expr == "" {
+		return "", false
+	}
+	return expr, true
+}
+
+// decodeCaseExprSafe builds the decode body for the Safe path.
+// It uses the validated, allocating helpers like ReadStringBytes.
+func decodeCaseExprSafe(structName, goName string, typ ast.Expr) (string, bool) {
+	data := decodeCaseTemplateData{Field: goName}
+	tmplName := ""
+	rt := runtimeName
+
+	switch t := typ.(type) {
+	case *ast.Ident:
+		switch t.Name {
+		case "string":
+			data.VarType = "string"
+			data.ReadFunc = rt("ReadStringBytes")
+		case "bool":
+			data.VarType = "bool"
+			data.ReadFunc = rt("ReadBoolBytes")
+		case "int":
+			data.VarType = "int"
+			data.ReadFunc = rt("ReadIntBytes")
+		case "int64":
+			data.VarType = "int64"
+			data.ReadFunc = rt("ReadInt64Bytes")
+		case "int32", "rune":
+			data.VarType = "int32"
+			data.ReadFunc = rt("ReadInt32Bytes")
+		case "int16":
+			data.VarType = "int16"
+			data.ReadFunc = rt("ReadInt16Bytes")
+		case "int8":
+			data.VarType = "int8"
+			data.ReadFunc = rt("ReadInt8Bytes")
+		case "uint":
+			data.VarType = "uint"
+			data.ReadFunc = rt("ReadUintBytes")
+		case "uint64":
+			data.VarType = "uint64"
+			data.ReadFunc = rt("ReadUint64Bytes")
+		case "uint32":
+			data.VarType = "uint32"
+			data.ReadFunc = rt("ReadUint32Bytes")
+		case "uint16":
+			data.VarType = "uint16"
+			data.ReadFunc = rt("ReadUint16Bytes")
+		case "uint8", "byte":
+			data.VarType = "uint8"
+			data.ReadFunc = rt("ReadUint8Bytes")
+		case "float32":
+			data.VarType = "float32"
+			data.ReadFunc = rt("ReadFloat32Bytes")
+		case "float64":
+			data.VarType = "float64"
+			data.ReadFunc = rt("ReadFloat64Bytes")
+		default:
+			// Fallback: assume user-defined type with UnmarshalCBOR.
+			data.VarType = t.Name
+			tmplName = "decodeCaseUnmarshalField"
+		}
+		if tmplName == "" {
+			tmplName = "decodeCaseBasic"
+		}
+	case *ast.SelectorExpr:
+		if pkg, ok := t.X.(*ast.Ident); ok {
+			switch pkg.Name {
+			case "time":
+				switch t.Sel.Name {
+				case "Time":
+					data.VarType = "time.Time"
+					data.ReadFunc = rt("ReadTimeBytes")
+				case "Duration":
+					data.VarType = "time.Duration"
+					data.ReadFunc = rt("ReadDurationBytes")
+				default:
+					return "", false
+				}
+				tmplName = "decodeCaseBasic"
+			case "json":
+				if t.Sel.Name != "Number" {
+					return "", false
+				}
+				data.VarType = "json.Number"
+				data.ReadFunc = rt("ReadJSONNumberBytes")
+				tmplName = "decodeCaseBasic"
+			case "cbor":
+				if t.Sel.Name == "Raw" || t.Sel.Name == "Number" {
+					data.VarType = ""
+					tmplName = "decodeCaseUnmarshalField"
+					break
+				}
+				return "", false
+			default:
+				return "", false
+			}
+		} else {
+			return "", false
+		}
+	case *ast.ArrayType:
+		// []T containers
+		if t.Len != nil {
+			return "", false
+		}
+		// []byte special case
+		if ident, ok := t.Elt.(*ast.Ident); ok && ident.Name == "byte" {
+			tmplName = "decodeCaseBytes"
+			break
+		}
+		// Slice of scalar elements handled via template
+		if ident, ok := t.Elt.(*ast.Ident); ok {
+			switch ident.Name {
+			case "string":
+				data.VarType = "string"
+				data.ReadFunc = rt("ReadStringBytes")
+			case "bool":
+				data.VarType = "bool"
+				data.ReadFunc = rt("ReadBoolBytes")
+			case "int":
+				data.VarType = "int"
+				data.ReadFunc = rt("ReadIntBytes")
+			case "int64":
+				data.VarType = "int64"
+				data.ReadFunc = rt("ReadInt64Bytes")
+			case "int32", "rune":
+				data.VarType = "int32"
+				data.ReadFunc = rt("ReadInt32Bytes")
+			case "int16":
+				data.VarType = "int16"
+				data.ReadFunc = rt("ReadInt16Bytes")
+			case "int8":
+				data.VarType = "int8"
+				data.ReadFunc = rt("ReadInt8Bytes")
+			case "uint":
+				data.VarType = "uint"
+				data.ReadFunc = rt("ReadUintBytes")
+			case "uint64":
+				data.VarType = "uint64"
+				data.ReadFunc = rt("ReadUint64Bytes")
+			case "uint32":
+				data.VarType = "uint32"
+				data.ReadFunc = rt("ReadUint32Bytes")
+			case "uint16":
+				data.VarType = "uint16"
+				data.ReadFunc = rt("ReadUint16Bytes")
+			case "uint8", "byte":
+				data.VarType = "uint8"
+				data.ReadFunc = rt("ReadUint8Bytes")
+			case "float32":
+				data.VarType = "float32"
+				data.ReadFunc = rt("ReadFloat32Bytes")
+			case "float64":
+				data.VarType = "float64"
+				data.ReadFunc = rt("ReadFloat64Bytes")
+			default:
+				data.VarType = ident.Name
+				tmplName = "decodeCaseSliceStruct"
+			}
+			if tmplName == "" {
+				tmplName = "decodeCaseSliceBasic"
+			}
+			break
+		}
+		// []*T where T has UnmarshalCBOR
+		if star, ok := t.Elt.(*ast.StarExpr); ok {
+			if ident, ok2 := star.X.(*ast.Ident); ok2 {
+				data.VarType = ident.Name
+				tmplName = "decodeCaseSlicePtrStruct"
+				break
+			}
+		}
+		return "", false
+	case *ast.MapType:
+		// map[K]T containers
+		keyIdent, okKey := t.Key.(*ast.Ident)
+		if !okKey {
+			return "", false
+		}
+		// Numeric-key maps we know how to handle: map[uint64]*T, map[uint64]uint64
+		if keyIdent.Name == "uint64" {
+			if star, okVal := t.Value.(*ast.StarExpr); okVal {
+				if ident, ok2 := star.X.(*ast.Ident); ok2 {
+					data.VarType = ident.Name
+					tmplName = "decodeCaseMapUint64Ptr"
+					break
+				}
+			}
+			if valIdent, okVal := t.Value.(*ast.Ident); okVal && valIdent.Name == "uint64" {
+				tmplName = "decodeCaseMapUint64Uint64"
+				break
+			}
+			return "", false
+		}
+		// map[string]T containers
+		if keyIdent.Name != "string" {
+			return "", false
+		}
+		// map[string]scalar via template, or map[string]struct via dedicated template
+		if valIdent, okVal := t.Value.(*ast.Ident); okVal {
+			switch valIdent.Name {
+			case "string":
+				data.VarType = "string"
+				data.ReadFunc = rt("ReadStringBytes")
+			case "bool":
+				data.VarType = "bool"
+				data.ReadFunc = rt("ReadBoolBytes")
+			case "int":
+				data.VarType = "int"
+				data.ReadFunc = rt("ReadIntBytes")
+			case "int64":
+				data.VarType = "int64"
+				data.ReadFunc = rt("ReadInt64Bytes")
+			case "int32", "rune":
+				data.VarType = "int32"
+				data.ReadFunc = rt("ReadInt32Bytes")
+			case "int16":
+				data.VarType = "int16"
+				data.ReadFunc = rt("ReadInt16Bytes")
+			case "int8":
+				data.VarType = "int8"
+				data.ReadFunc = rt("ReadInt8Bytes")
+			case "uint":
+				data.VarType = "uint"
+				data.ReadFunc = rt("ReadUintBytes")
+			case "uint64":
+				data.VarType = "uint64"
+				data.ReadFunc = rt("ReadUint64Bytes")
+			case "uint32":
+				data.VarType = "uint32"
+				data.ReadFunc = rt("ReadUint32Bytes")
+			case "uint16":
+				data.VarType = "uint16"
+				data.ReadFunc = rt("ReadUint16Bytes")
+			case "uint8", "byte":
+				data.VarType = "uint8"
+				data.ReadFunc = rt("ReadUint8Bytes")
+			case "float32":
+				data.VarType = "float32"
+				data.ReadFunc = rt("ReadFloat32Bytes")
+			case "float64":
+				data.VarType = "float64"
+				data.ReadFunc = rt("ReadFloat64Bytes")
+			default:
+				data.VarType = valIdent.Name
+				tmplName = "decodeCaseMapStrStruct"
+			}
+			if tmplName == "" {
+				tmplName = "decodeCaseMapStrBasic"
+			}
+			break
+		}
+		// map[string]*T where T has UnmarshalCBOR
+		if star, okVal := t.Value.(*ast.StarExpr); okVal {
+			if ident, ok2 := star.X.(*ast.Ident); ok2 {
+				data.VarType = ident.Name
+				tmplName = "decodeCaseMapStrPtrStruct"
+				break
+			}
+		}
+		return "", false
+	case *ast.StarExpr:
+		// Pointer to user-defined type with UnmarshalCBOR.
+		if ident, ok := t.X.(*ast.Ident); ok {
+			data.VarType = ident.Name
+			tmplName = "decodeCasePtrUnmarshalField"
+			break
+		}
+		return "", false
+	default:
+		return "", false
+	}
+
+	var buf bytes.Buffer
+	if err := decodeCaseTemplate.ExecuteTemplate(&buf, tmplName, data); err != nil {
+		return "", false
+	}
+	expr := strings.TrimRight(buf.String(), "\n")
+	if expr == "" {
+		return "", false
+	}
+	return expr, true
+}
+
+// decodeCaseExprTrusted builds the decode body for the Trusted path.
+// For strings it uses zero-copy ReadStringZC + UnsafeString; other
+// scalar types share the same helpers as the Safe path.
+func decodeCaseExprTrusted(structName, goName string, typ ast.Expr) (string, bool) {
+	data := decodeCaseTemplateData{Field: goName}
+	tmplName := ""
+	rt := runtimeName
+
+	switch t := typ.(type) {
+	case *ast.MapType:
+		keyIdent, okKey := t.Key.(*ast.Ident)
+		if !okKey {
+			return "", false
+		}
+
+		// map[uint64]*T and map[uint64]uint64 fast paths for Trusted
+		if keyIdent.Name == "uint64" {
+			if starVal, ok := t.Value.(*ast.StarExpr); ok {
+				if ident, ok2 := starVal.X.(*ast.Ident); ok2 {
+					data.VarType = ident.Name
+					tmplName = "decodeCaseMapUint64PtrTrusted"
+				}
+			} else if valIdent, ok := t.Value.(*ast.Ident); ok && valIdent.Name == "uint64" {
+				tmplName = "decodeCaseMapUint64Uint64Trusted"
+			}
+			if tmplName == "" {
+				return "", false
+			}
+			break
+		}
+
+		// map[string]T containers for scalar or struct T (Trusted path)
+		if keyIdent.Name != "string" {
+			return "", false
+		}
+		if valIdent, okVal := t.Value.(*ast.Ident); okVal {
+			switch valIdent.Name {
+			case "string":
+				data.VarType = "string"
+				data.ReadFunc = rt("ReadStringBytes")
+			case "bool":
+				data.VarType = "bool"
+				data.ReadFunc = rt("ReadBoolBytes")
+			case "int":
+				data.VarType = "int"
+				data.ReadFunc = rt("ReadIntBytes")
+			case "int64":
+				data.VarType = "int64"
+				data.ReadFunc = rt("ReadInt64Bytes")
+			case "int32", "rune":
+				data.VarType = "int32"
+				data.ReadFunc = rt("ReadInt32Bytes")
+			case "int16":
+				data.VarType = "int16"
+				data.ReadFunc = rt("ReadInt16Bytes")
+			case "int8":
+				data.VarType = "int8"
+				data.ReadFunc = rt("ReadInt8Bytes")
+			case "uint":
+				data.VarType = "uint"
+				data.ReadFunc = rt("ReadUintBytes")
+			case "uint64":
+				data.VarType = "uint64"
+				data.ReadFunc = rt("ReadUint64Bytes")
+			case "uint32":
+				data.VarType = "uint32"
+				data.ReadFunc = rt("ReadUint32Bytes")
+			case "uint16":
+				data.VarType = "uint16"
+				data.ReadFunc = rt("ReadUint16Bytes")
+			case "uint8", "byte":
+				data.VarType = "uint8"
+				data.ReadFunc = rt("ReadUint8Bytes")
+			case "float32":
+				data.VarType = "float32"
+				data.ReadFunc = rt("ReadFloat32Bytes")
+			case "float64":
+				data.VarType = "float64"
+				data.ReadFunc = rt("ReadFloat64Bytes")
+			default:
+				data.VarType = valIdent.Name
+				if _, ok := generatedStructs[valIdent.Name]; ok {
+					tmplName = "decodeCaseMapStrStructTrusted"
+				} else {
+					tmplName = "decodeCaseMapStrStruct"
+				}
+			}
+			if tmplName == "" {
+				tmplName = "decodeCaseMapStrBasic"
+			}
+			break
+		}
+		if star, okVal := t.Value.(*ast.StarExpr); okVal {
+			if ident, ok2 := star.X.(*ast.Ident); ok2 {
+				data.VarType = ident.Name
+				if _, ok := generatedStructs[ident.Name]; ok {
+					tmplName = "decodeCaseMapStrPtrStructTrusted"
+				} else if tmplName == "" {
+					tmplName = "decodeCaseMapStrPtrStruct"
+				}
+				break
+			}
+		}
+		return "", false
+
+	case *ast.Ident:
+		switch t.Name {
+		case "string":
+			// Use dedicated trusted string template.
+			tmplName = "decodeCaseStringTrusted"
+		case "bool":
+			data.VarType = "bool"
+			data.ReadFunc = rt("ReadBoolBytes")
+		case "int":
+			data.VarType = "int"
+			data.ReadFunc = rt("ReadIntBytes")
+		case "int64":
+			data.VarType = "int64"
+			data.ReadFunc = rt("ReadInt64Bytes")
+		case "int32", "rune":
+			data.VarType = "int32"
+			data.ReadFunc = rt("ReadInt32Bytes")
+		case "int16":
+			data.VarType = "int16"
+			data.ReadFunc = rt("ReadInt16Bytes")
+		case "int8":
+			data.VarType = "int8"
+			data.ReadFunc = rt("ReadInt8Bytes")
+		case "uint":
+			data.VarType = "uint"
+			data.ReadFunc = rt("ReadUintBytes")
+		case "uint64":
+			data.VarType = "uint64"
+			data.ReadFunc = rt("ReadUint64Bytes")
+		case "uint32":
+			data.VarType = "uint32"
+			data.ReadFunc = rt("ReadUint32Bytes")
+		case "uint16":
+			data.VarType = "uint16"
+			data.ReadFunc = rt("ReadUint16Bytes")
+		case "uint8", "byte":
+			data.VarType = "uint8"
+			data.ReadFunc = rt("ReadUint8Bytes")
+		case "float32":
+			data.VarType = "float32"
+			data.ReadFunc = rt("ReadFloat32Bytes")
+		case "float64":
+			data.VarType = "float64"
+			data.ReadFunc = rt("ReadFloat64Bytes")
+		default:
+			// Fallback: user-defined type. If it's a struct we
+			// generated code for, prefer DecodeTrusted. Otherwise,
+			// use the UnmarshalCBOR-based path (Safe decoder).
+			data.VarType = t.Name
+			if _, ok := generatedStructs[t.Name]; ok {
+				tmplName = "decodeCaseTrustedField"
+			} else {
+				tmplName = "decodeCaseUnmarshalField"
+			}
+		}
+		if tmplName == "" {
+			tmplName = "decodeCaseBasic"
+		}
+	case *ast.SelectorExpr:
+		if pkg, ok := t.X.(*ast.Ident); ok {
+			switch pkg.Name {
+			case "time":
+				switch t.Sel.Name {
+				case "Time":
+					data.VarType = "time.Time"
+					data.ReadFunc = rt("ReadTimeBytes")
+				case "Duration":
+					data.VarType = "time.Duration"
+					data.ReadFunc = rt("ReadDurationBytes")
+				default:
+					return "", false
+				}
+				if tmplName == "" {
+					tmplName = "decodeCaseBasic"
+				}
+			case "json":
+				if t.Sel.Name != "Number" {
+					return "", false
+				}
+				data.VarType = "json.Number"
+				data.ReadFunc = rt("ReadJSONNumberBytes")
+				if tmplName == "" {
+					tmplName = "decodeCaseBasic"
+				}
+			case "cbor":
+				if t.Sel.Name == "Raw" || t.Sel.Name == "Number" {
+					if tmplName == "" {
+						tmplName = "decodeCaseUnmarshalField"
+					}
+					break
+				}
+				return "", false
+			default:
+				return "", false
+			}
+		} else {
+			return "", false
+		}
+	case *ast.ArrayType:
+		// []T containers (Trusted path uses same scalar readers
+		// but prefers DecodeTrusted for generated struct types).
+		if t.Len != nil {
+			return "", false
+		}
+		if ident, ok := t.Elt.(*ast.Ident); ok && ident.Name == "byte" {
+			tmplName = "decodeCaseBytes"
+			break
+		}
+		if ident, ok := t.Elt.(*ast.Ident); ok {
+			switch ident.Name {
+			case "string":
+				data.VarType = "string"
+				data.ReadFunc = rt("ReadStringBytes")
+			case "bool":
+				data.VarType = "bool"
+				data.ReadFunc = rt("ReadBoolBytes")
+			case "int":
+				data.VarType = "int"
+				data.ReadFunc = rt("ReadIntBytes")
+			case "int64":
+				data.VarType = "int64"
+				data.ReadFunc = rt("ReadInt64Bytes")
+			case "int32", "rune":
+				data.VarType = "int32"
+				data.ReadFunc = rt("ReadInt32Bytes")
+			case "int16":
+				data.VarType = "int16"
+				data.ReadFunc = rt("ReadInt16Bytes")
+			case "int8":
+				data.VarType = "int8"
+				data.ReadFunc = rt("ReadInt8Bytes")
+			case "uint":
+				data.VarType = "uint"
+				data.ReadFunc = rt("ReadUintBytes")
+			case "uint64":
+				data.VarType = "uint64"
+				data.ReadFunc = rt("ReadUint64Bytes")
+			case "uint32":
+				data.VarType = "uint32"
+				data.ReadFunc = rt("ReadUint32Bytes")
+			case "uint16":
+				data.VarType = "uint16"
+				data.ReadFunc = rt("ReadUint16Bytes")
+			case "uint8", "byte":
+				data.VarType = "uint8"
+				data.ReadFunc = rt("ReadUint8Bytes")
+			case "float32":
+				data.VarType = "float32"
+				data.ReadFunc = rt("ReadFloat32Bytes")
+			case "float64":
+				data.VarType = "float64"
+				data.ReadFunc = rt("ReadFloat64Bytes")
+			default:
+				data.VarType = ident.Name
+				if _, ok := generatedStructs[ident.Name]; ok {
+					tmplName = "decodeCaseSliceStructTrusted"
+				} else {
+					tmplName = "decodeCaseSliceStruct"
+				}
+			}
+			if tmplName == "" {
+				tmplName = "decodeCaseSliceBasic"
+			}
+			break
+		}
+		if star, ok := t.Elt.(*ast.StarExpr); ok {
+			if ident, ok2 := star.X.(*ast.Ident); ok2 {
+				data.VarType = ident.Name
+				if _, ok := generatedStructs[ident.Name]; ok {
+					tmplName = "decodeCaseSlicePtrStructTrusted"
+				} else {
+					tmplName = "decodeCaseSlicePtrStruct"
+				}
+				break
+			}
+		}
+		return "", false
+	case *ast.StarExpr:
+		// Pointer to user-defined type. If the underlying type is a
+		// generated struct, prefer DecodeTrusted; otherwise fall back
+		// to the UnmarshalCBOR-based pointer path.
+		if ident, ok := t.X.(*ast.Ident); ok {
+			data.VarType = ident.Name
+			if _, ok := generatedStructs[ident.Name]; ok {
+				tmplName = "decodeCasePtrTrustedField"
+			} else {
+				tmplName = "decodeCasePtrUnmarshalField"
+			}
+			break
+		}
+		return "", false
+	default:
+		return "", false
+	}
+
+	var buf bytes.Buffer
+	if err := decodeCaseTemplate.ExecuteTemplate(&buf, tmplName, data); err != nil {
+		return "", false
+	}
+	expr := strings.TrimRight(buf.String(), "\n")
+	if expr == "" {
+		return "", false
+	}
+	return expr, true
+}
+
+// marshalTemplate drives per-struct MarshalCBOR/UnmarshalCBOR generation.
+// It uses the runtime helpers from github.com/synadia-labs/cbor-go/runtime.
+//
+// ParseFS returns templates named by their filenames; we parse the
+// marshal.go.tpl file and then execute that template directly.
+var marshalTemplate = template.Must(template.New("marshal.go.tpl").Funcs(templateFuncs).ParseFS(tmplfs.FS, "marshal.go.tpl"))
+
+// encodeExprForField returns a concrete encode expression for a field
+// where we want to avoid the generic AppendInterface path. It returns an
+// empty string when the generic path should be used.
+func encodeExprForField(goName string, typ ast.Expr) string {
+	field := "x." + goName
+	rt := runtimeName
+
+	switch t := typ.(type) {
+	case *ast.Ident:
+		// Specialize primitive scalars to direct AppendX calls so we
+		// avoid the overhead of AppendInterface in hot paths.
+		switch t.Name {
+		case "string":
+			return rt("AppendString") + "(b, " + field + "), nil"
+		case "bool":
+			return rt("AppendBool") + "(b, " + field + "), nil"
+		case "int":
+			return rt("AppendInt") + "(b, " + field + "), nil"
+		case "int8":
+			return rt("AppendInt8") + "(b, " + field + "), nil"
+		case "int16":
+			return rt("AppendInt16") + "(b, " + field + "), nil"
+		case "int32", "rune":
+			return rt("AppendInt32") + "(b, " + field + "), nil"
+		case "int64":
+			return rt("AppendInt64") + "(b, " + field + "), nil"
+		case "uint":
+			return rt("AppendUint") + "(b, " + field + "), nil"
+		case "uint8", "byte":
+			return rt("AppendUint8") + "(b, " + field + "), nil"
+		case "uint16":
+			return rt("AppendUint16") + "(b, " + field + "), nil"
+		case "uint32":
+			return rt("AppendUint32") + "(b, " + field + "), nil"
+		case "uint64":
+			return rt("AppendUint64") + "(b, " + field + "), nil"
+		case "float32":
+			return rt("AppendFloat32") + "(b, " + field + "), nil"
+		case "float64":
+			return rt("AppendFloat64") + "(b, " + field + "), nil"
+		}
+		// For non-primitive identifiers, assume a struct type with
+		// a generated or user-defined MarshalCBOR method.
+		return field + ".MarshalCBOR(b)"
+
+	case *ast.ArrayType:
+		// Slices: specialize []string; more complex shapes rely on
+		// EncodeBlock-generated loops when appropriate.
+		if t.Len != nil {
+			return ""
+		}
+		if ident, ok := t.Elt.(*ast.Ident); ok && ident.Name == "string" {
+			return rt("AppendStringSlice") + "(b, " + field + "), nil"
+		}
+
+	case *ast.MapType:
+		// Map[string]string remains supported via a helper; other
+		// hot maps (e.g. ConsumerState.Pending/Redelivered) use
+		// EncodeBlock-generated loops.
+		keyIdent, okKey := t.Key.(*ast.Ident)
+		if !okKey {
+			return ""
+		}
+		if keyIdent.Name == "string" {
+			if valIdent, okVal := t.Value.(*ast.Ident); okVal && valIdent.Name == "string" {
+				return rt("AppendMapStrStr") + "(b, " + field + "), nil"
+			}
+		}
+
+	case *ast.StarExpr:
+		// *T where T is exported; assume *T implements Marshaler.
+		if ident, ok := t.X.(*ast.Ident); ok && ast.IsExported(ident.Name) {
+			return rt("AppendPtrMarshaler") + "(b, " + field + ")"
+		}
+
+	case *ast.SelectorExpr:
+		// Handle common selector-based types, such as time.Time,
+		// time.Duration, and json.RawMessage, with direct calls.
+		if pkg, ok := t.X.(*ast.Ident); ok {
+			switch pkg.Name {
+			case "time":
+				switch t.Sel.Name {
+				case "Time":
+					return rt("AppendTime") + "(b, " + field + "), nil"
+				case "Duration":
+					return rt("AppendDuration") + "(b, " + field + "), nil"
+				}
+			case "json":
+				if t.Sel.Name == "RawMessage" {
+					return rt("AppendBytes") + "(b, []byte(" + field + ")), nil"
+				}
+			}
+		}
+	}
+
+	// Fallback: let AppendInterface handle this field.
+	return ""
+}
