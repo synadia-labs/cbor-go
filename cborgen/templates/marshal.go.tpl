@@ -2,6 +2,8 @@
 
 package {{.Package}}
 
+import cbor "github.com/synadia-labs/cbor-go/runtime"
+
 {{range .Structs}}
 {{if .MsgSizeExpr}}
 func (x {{.Name}}) Msgsize() (s int) {
