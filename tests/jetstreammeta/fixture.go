@@ -59,10 +59,10 @@ func BuildMetaSnapshotFixture(numStreams, numConsumers int) MetaSnapshot {
 		}
 		cfgJSON, _ := json.Marshal(cfg)
 
-			sa := &streamAssignment{
-				Client:     client,
-				Created:    baseTime.Add(time.Duration(i) * time.Millisecond),
-				ConfigJSON: json.RawMessage(cfgJSON),
+		sa := &streamAssignment{
+			Client:     client,
+			Created:    baseTime.Add(time.Duration(i) * time.Millisecond),
+			ConfigJSON: json.RawMessage(cfgJSON),
 			Group:      rg,
 			Sync:       "_INBOX.meta.sync",
 			consumers:  make(map[string]*consumerAssignment, numConsumers),

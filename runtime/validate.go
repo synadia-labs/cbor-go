@@ -1,7 +1,5 @@
 package cbor
 
-import ()
-
 // ValidateWellFormedBytes validates that the next CBOR data item in b is well-formed per RFC 8949
 // and returns the remaining bytes after that item.
 // Checks performed:
@@ -37,7 +35,7 @@ func validateWellFormed(b []byte, depth int) ([]byte, error) {
 
 	// Reserved additional info values 28, 29, 30 are not well-formed
 	if add == 28 || add == 29 || add == 30 {
-		return b, InvalidPrefixError{Want: major, Got: major}
+		return b, InvalidAdditionalInfoError{Major: major, Info: add}
 	}
 
 	switch major {
@@ -98,9 +96,9 @@ func validateWellFormed(b []byte, depth int) ([]byte, error) {
 				if err != nil {
 					return b, err
 				}
-            if !isUTF8Valid(chunk) {
-                return b, ErrInvalidUTF8
-            }
+				if !isUTF8Valid(chunk) {
+					return b, ErrInvalidUTF8
+				}
 				p = o
 			}
 		}
@@ -109,9 +107,9 @@ func validateWellFormed(b []byte, depth int) ([]byte, error) {
 		if err != nil {
 			return b, err
 		}
-        if !isUTF8Valid(s) {
-            return b, ErrInvalidUTF8
-        }
+		if !isUTF8Valid(s) {
+			return b, ErrInvalidUTF8
+		}
 		return o, nil
 
 	case majorTypeArray:

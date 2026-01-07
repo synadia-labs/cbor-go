@@ -9,8 +9,8 @@ import (
 	"text/tabwriter"
 	"time"
 
-	js "github.com/synadia-labs/cbor-go/tests/jetstreammeta"
 	msgpjs "github.com/synadia-labs/cbor-go/benchmarks/jetstreammeta_msgp"
+	js "github.com/synadia-labs/cbor-go/tests/jetstreammeta"
 )
 
 type benchResult struct {

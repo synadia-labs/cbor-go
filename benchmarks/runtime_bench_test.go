@@ -75,4 +75,3 @@ func BenchmarkMsgp_AppendBytes(b *testing.B) {
 	}
 	_ = out
 }
-

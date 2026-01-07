@@ -6,6 +6,11 @@ import (
 	"strconv"
 )
 
+const (
+	float32SignBit uint64 = (math.MaxUint32 + 1) >> 1 // IEEE 754 float32 sign bit.
+	float64SignBit uint64 = (math.MaxUint64 + 1) >> 1 // IEEE 754 float64 sign bit.
+)
+
 // Number represents a CBOR number that may be an int64, uint64,
 // float32, or float64 internally. The zero value is equivalent to
 // an int64 value of 0.
@@ -143,7 +148,7 @@ func (n *Number) CoerceInt() (int64, bool) {
 		if n.isExactInt() && f <= math.MaxInt64 && f >= math.MinInt64 {
 			return int64(f), true
 		}
-		if n.bits == 0 || n.bits == 1<<31 {
+		if n.bits == 0 || n.bits == float32SignBit {
 			return 0, true
 		}
 	case Float64Type:
@@ -151,7 +156,7 @@ func (n *Number) CoerceInt() (int64, bool) {
 		if n.isExactInt() && f <= math.MaxInt64 && f >= math.MinInt64 {
 			return int64(f), true
 		}
-		return 0, n.bits == 0 || n.bits == 1<<63
+		return 0, n.bits == 0 || n.bits == float64SignBit
 	}
 	return 0, false
 }
@@ -171,7 +176,7 @@ func (n *Number) CoerceUInt() (uint64, bool) {
 		if f >= 0 && f <= math.MaxUint64 && n.isExactInt() {
 			return uint64(f), true
 		}
-		if n.bits == 0 || n.bits == 1<<31 {
+		if n.bits == 0 || n.bits == float32SignBit {
 			return 0, true
 		}
 	case Float64Type:
@@ -179,7 +184,7 @@ func (n *Number) CoerceUInt() (uint64, bool) {
 		if f >= 0 && f <= math.MaxUint64 && n.isExactInt() {
 			return uint64(f), true
 		}
-		return 0, n.bits == 0 || n.bits == 1<<63
+		return 0, n.bits == 0 || n.bits == float64SignBit
 	}
 	return 0, false
 }
@@ -267,4 +272,3 @@ func (n *Number) String() string {
 		return "0"
 	}
 }
-

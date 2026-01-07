@@ -63,9 +63,9 @@ func TestContainersRoundTripSafeAndTrusted(t *testing.T) {
 		D:    7 * time.Second,
 	}
 	orig := &Containers{
-		Items: []Scalars{base, ptr},
-		Ptrs:  []*Scalars{&base, &ptr},
-		Map:   map[string]Scalars{"a": base, "b": ptr},
+		Items:  []Scalars{base, ptr},
+		Ptrs:   []*Scalars{&base, &ptr},
+		Map:    map[string]Scalars{"a": base, "b": ptr},
 		PtrMap: map[string]*Scalars{"x": &base, "y": &ptr},
 	}
 

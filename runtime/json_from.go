@@ -14,25 +14,25 @@ import (
 // FromJSONBytes converts a JSON document into CBOR bytes using a
 // wrapper convention similar to RFC examples and the prototype:
 //
-//  - null/bool/number/string/array/object map naturally to CBOR
-//    nil/bool/float-or-int/text/array/map.
-//  - Wrapper objects are recognized and mapped to semantic tags:
-//      {"$rfc3339": string}         -> tag(0) RFC3339 time string
-//      {"$epoch": number}           -> tag(1) epoch seconds (int or float)
-//      {"$decimal":[exp, mant]}     -> tag(4)
-//      {"$bigfloat":[exp, mant]}    -> tag(5)
-//      {"$base64url": string}       -> tag(21) bytes (base64url)
-//      {"$base64": string}          -> tag(22) bytes (base64 std)
-//      {"$base16": string}          -> tag(23) bytes (hex)
-//      {"$cbor": string}            -> tag(24) embedded CBOR (base64)
-//      {"$uri": string}             -> tag(32) URI (text)
-//      {"$base64urlstr": string}    -> tag(33) text
-//      {"$base64str": string}       -> tag(34) text
-//      {"$regex": string}           -> tag(35) regex (text)
-//      {"$mime": string}            -> tag(36) MIME (text)
-//      {"$uuid": string}            -> tag(37) UUID (canonical hyphenated)
-//      {"$selfdescribe": true}      -> tag(55799)
-//      {"$tag":N, "$":value}       -> generic tag N
+//   - null/bool/number/string/array/object map naturally to CBOR
+//     nil/bool/float-or-int/text/array/map.
+//   - Wrapper objects are recognized and mapped to semantic tags:
+//     {"$rfc3339": string}         -> tag(0) RFC3339 time string
+//     {"$epoch": number}           -> tag(1) epoch seconds (int or float)
+//     {"$decimal":[exp, mant]}     -> tag(4)
+//     {"$bigfloat":[exp, mant]}    -> tag(5)
+//     {"$base64url": string}       -> tag(21) bytes (base64url)
+//     {"$base64": string}          -> tag(22) bytes (base64 std)
+//     {"$base16": string}          -> tag(23) bytes (hex)
+//     {"$cbor": string}            -> tag(24) embedded CBOR (base64)
+//     {"$uri": string}             -> tag(32) URI (text)
+//     {"$base64urlstr": string}    -> tag(33) text
+//     {"$base64str": string}       -> tag(34) text
+//     {"$regex": string}           -> tag(35) regex (text)
+//     {"$mime": string}            -> tag(36) MIME (text)
+//     {"$uuid": string}            -> tag(37) UUID (canonical hyphenated)
+//     {"$selfdescribe": true}      -> tag(55799)
+//     {"$tag":N, "$":value}       -> generic tag N
 func FromJSONBytes(js []byte) ([]byte, error) {
 	dec := json.NewDecoder(strings.NewReader(string(js)))
 	dec.UseNumber()

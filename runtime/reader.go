@@ -329,6 +329,9 @@ func isNonCanonicalLength(b []byte, expectedMajor uint8) (bool, error) {
 		return false, badPrefix(getMajorType(b[0]), expectedMajor)
 	}
 	add := getAddInfo(b[0])
+	if add >= 28 && add <= 30 {
+		return false, InvalidAdditionalInfoError{Major: expectedMajor, Info: add}
+	}
 	switch add {
 	case addInfoIndefinite:
 		// Canonicality applies to definite lengths; indefinite is
@@ -380,7 +383,11 @@ func isNonCanonicalLength(b []byte, expectedMajor uint8) (bool, error) {
 	}
 }
 
-func isNonCanonicalArrayLength(b []byte) (bool, error) { return isNonCanonicalLength(b, majorTypeArray) }
-func isNonCanonicalMapLength(b []byte) (bool, error)   { return isNonCanonicalLength(b, majorTypeMap) }
-func isNonCanonicalBytesLength(b []byte) (bool, error) { return isNonCanonicalLength(b, majorTypeBytes) }
-func isNonCanonicalTextLength(b []byte) (bool, error)  { return isNonCanonicalLength(b, majorTypeText) }
+func isNonCanonicalArrayLength(b []byte) (bool, error) {
+	return isNonCanonicalLength(b, majorTypeArray)
+}
+func isNonCanonicalMapLength(b []byte) (bool, error) { return isNonCanonicalLength(b, majorTypeMap) }
+func isNonCanonicalBytesLength(b []byte) (bool, error) {
+	return isNonCanonicalLength(b, majorTypeBytes)
+}
+func isNonCanonicalTextLength(b []byte) (bool, error) { return isNonCanonicalLength(b, majorTypeText) }

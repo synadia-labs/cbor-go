@@ -86,4 +86,3 @@ func TestRFCExamplesDiagAndWellFormed(t *testing.T) {
 		})
 	}
 }
-

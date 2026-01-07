@@ -44,7 +44,6 @@ var (
 
 	// ErrNonCanonicalLength is returned when a length (array/map/str/bytes) is not encoded in the shortest form.
 	ErrNonCanonicalLength error = errors.New("cbor: non-canonical length encoding")
-
 )
 
 // Error is the interface satisfied
@@ -321,6 +320,21 @@ func (i InvalidPrefixError) Error() string {
 
 // Resumable returns 'false' for InvalidPrefixErrors
 func (i InvalidPrefixError) Resumable() bool { return false }
+
+// InvalidAdditionalInfoError is returned when a reserved additional info
+// value (28, 29, 30) is encountered per RFC 8949.
+type InvalidAdditionalInfoError struct {
+	Major uint8
+	Info  uint8
+}
+
+// Error implements the error interface.
+func (i InvalidAdditionalInfoError) Error() string {
+	return "cbor: invalid additional info " + strconv.Itoa(int(i.Info)) + " for major type " + strconv.Itoa(int(i.Major))
+}
+
+// Resumable returns 'false' for InvalidAdditionalInfoErrors.
+func (i InvalidAdditionalInfoError) Resumable() bool { return false }
 
 // ErrUnsupportedType is returned when a bad argument is supplied to
 // a function that accepts arbitrary values.

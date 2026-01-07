@@ -36,4 +36,3 @@ func BenchmarkCBORRuntime_JetStreamMetaSnapshot_Encode(b *testing.B) {
 	}
 	_ = out
 }
-

@@ -38,4 +38,3 @@ func ReadJSONNumberBytes(b []byte) (json.Number, []byte, error) {
 		return "", b, &ErrUnsupportedType{}
 	}
 }
-

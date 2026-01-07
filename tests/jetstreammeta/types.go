@@ -114,22 +114,22 @@ type Pending struct {
 // ConsumerState mirrors the NATS ConsumerState type sufficiently to
 // exercise a realistic nested map workload when encoding.
 type ConsumerState struct {
-	Delivered   SequencePair         `json:"delivered" msg:"delivered"`
-	AckFloor    SequencePair         `json:"ack_floor" msg:"ack_floor"`
-	Pending     map[uint64]*Pending  `json:"pending,omitempty" msg:"pending,omitempty"`
-	Redelivered map[uint64]uint64    `json:"redelivered,omitempty" msg:"redelivered,omitempty"`
+	Delivered   SequencePair        `json:"delivered" msg:"delivered"`
+	AckFloor    SequencePair        `json:"ack_floor" msg:"ack_floor"`
+	Pending     map[uint64]*Pending `json:"pending,omitempty" msg:"pending,omitempty"`
+	Redelivered map[uint64]uint64   `json:"redelivered,omitempty" msg:"redelivered,omitempty"`
 }
 
 // consumerAssignment mirrors just the subset of NATS' consumer
 // assignment struct that participates in meta snapshots.
 type consumerAssignment struct {
-	Client     *ClientInfo    `json:"client,omitempty" msg:"client,omitempty"`
-	Created    time.Time      `json:"created" msg:"created"`
-	Name       string         `json:"name" msg:"name"`
-	Stream     string         `json:"stream" msg:"stream"`
+	Client     *ClientInfo     `json:"client,omitempty" msg:"client,omitempty"`
+	Created    time.Time       `json:"created" msg:"created"`
+	Name       string          `json:"name" msg:"name"`
+	Stream     string          `json:"stream" msg:"stream"`
 	ConfigJSON json.RawMessage `json:"consumer" msg:"consumer"`
-	Group      *RaftGroup     `json:"group" msg:"group"`
-	State      *ConsumerState `json:"state,omitempty" msg:"state,omitempty"`
+	Group      *RaftGroup      `json:"group" msg:"group"`
+	State      *ConsumerState  `json:"state,omitempty" msg:"state,omitempty"`
 	// Internal (not marshalled)
 	pending bool `json:"-" msg:"-"`
 }
@@ -137,11 +137,11 @@ type consumerAssignment struct {
 // streamAssignment mirrors the NATS streamAssignment type, again
 // limited to the fields that flow into writeable snapshots.
 type streamAssignment struct {
-	Client     *ClientInfo `json:"client,omitempty" msg:"client,omitempty"`
-	Created    time.Time   `json:"created" msg:"created"`
+	Client     *ClientInfo     `json:"client,omitempty" msg:"client,omitempty"`
+	Created    time.Time       `json:"created" msg:"created"`
 	ConfigJSON json.RawMessage `json:"stream" msg:"stream"`
-	Group      *RaftGroup  `json:"group" msg:"group"`
-	Sync       string      `json:"sync" msg:"sync"`
+	Group      *RaftGroup      `json:"group" msg:"group"`
+	Sync       string          `json:"sync" msg:"sync"`
 	// Internal (not marshalled)
 	consumers map[string]*consumerAssignment `json:"-" msg:"-"`
 }
@@ -149,23 +149,23 @@ type streamAssignment struct {
 // WriteableConsumerAssignment is the on-the-wire consumer snapshot
 // representation used by the JetStream meta snapshot.
 type WriteableConsumerAssignment struct {
-	Client     *ClientInfo    `json:"client,omitempty" msg:"client,omitempty"`
-	Created    time.Time      `json:"created" msg:"created"`
-	Name       string         `json:"name" msg:"name"`
-	Stream     string         `json:"stream" msg:"stream"`
+	Client     *ClientInfo     `json:"client,omitempty" msg:"client,omitempty"`
+	Created    time.Time       `json:"created" msg:"created"`
+	Name       string          `json:"name" msg:"name"`
+	Stream     string          `json:"stream" msg:"stream"`
 	ConfigJSON json.RawMessage `json:"consumer" msg:"consumer"`
-	Group      *RaftGroup     `json:"group" msg:"group"`
-	State      *ConsumerState `json:"state,omitempty" msg:"state,omitempty"`
+	Group      *RaftGroup      `json:"group" msg:"group"`
+	State      *ConsumerState  `json:"state,omitempty" msg:"state,omitempty"`
 }
 
 // WriteableStreamAssignment is the on-the-wire stream snapshot
 // representation used by the JetStream meta snapshot.
 type WriteableStreamAssignment struct {
-	Client     *ClientInfo                   `json:"client,omitempty" msg:"client,omitempty"`
-	Created    time.Time                     `json:"created" msg:"created"`
-	ConfigJSON json.RawMessage               `json:"stream" msg:"stream"`
-	Group      *RaftGroup                    `json:"group" msg:"group"`
-	Sync       string                        `json:"sync" msg:"sync"`
+	Client     *ClientInfo                    `json:"client,omitempty" msg:"client,omitempty"`
+	Created    time.Time                      `json:"created" msg:"created"`
+	ConfigJSON json.RawMessage                `json:"stream" msg:"stream"`
+	Group      *RaftGroup                     `json:"group" msg:"group"`
+	Sync       string                         `json:"sync" msg:"sync"`
 	Consumers  []*WriteableConsumerAssignment `json:"consumers,omitempty" msg:"consumers,omitempty"`
 }
 

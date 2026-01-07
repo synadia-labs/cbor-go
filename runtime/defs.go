@@ -25,13 +25,14 @@ import "errors"
 // RawPair represents an already-encoded CBOR key/value pair.
 // Key and Value must each contain exactly one CBOR item.
 type RawPair struct {
-    Key   []byte
-    Value []byte
+	Key   []byte
+	Value []byte
 }
+
 const (
-    // recursionLimit is the limit of recursive calls.
-    // This limits the call depth of dynamic code, like Skip and interface conversions.
-    recursionLimit = 100000
+	// recursionLimit is the limit of recursive calls.
+	// This limits the call depth of dynamic code, like Skip and interface conversions.
+	recursionLimit = 100000
 )
 
 // ErrNonCanonicalFloat is returned when a float is not encoded in the shortest form (strict mode).

@@ -59,16 +59,16 @@ func TestMetaSnapshot_Encode_DoesNotPanic(t *testing.T) {
 		Created:    testTime(),
 		Name:       "C",
 		Stream:     "S",
-			ConfigJSON: json.RawMessage(ccfgJSON),
+		ConfigJSON: json.RawMessage(ccfgJSON),
 		Group:      rg,
-			State: &ConsumerState{
-				Delivered: SequencePair{Consumer: 1, Stream: 1},
-				AckFloor:  SequencePair{Consumer: 0, Stream: 0},
-				Pending: map[uint64]*Pending{
-					1: {Sequence: 1, Timestamp: testTime().UnixNano()},
-				},
-				Redelivered: map[uint64]uint64{1: 2},
+		State: &ConsumerState{
+			Delivered: SequencePair{Consumer: 1, Stream: 1},
+			AckFloor:  SequencePair{Consumer: 0, Stream: 0},
+			Pending: map[uint64]*Pending{
+				1: {Sequence: 1, Timestamp: testTime().UnixNano()},
 			},
+			Redelivered: map[uint64]uint64{1: 2},
+		},
 	}
 	ws := WriteableStreamAssignment{
 		Client:     ci,

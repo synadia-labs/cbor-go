@@ -7,4 +7,3 @@ import "embed"
 //
 //go:embed *.go.tpl
 var FS embed.FS
-

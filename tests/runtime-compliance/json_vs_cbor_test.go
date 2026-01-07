@@ -20,7 +20,7 @@ func TestIsLikelyJSON_Classification(t *testing.T) {
 		{name: "json_null", data: []byte(`null`), want: true},
 		{name: "json_with_ws", data: []byte("  \n\t[1]"), want: true},
 		{name: "invalid_utf8", data: []byte{0xff, 0xfe, 0xfd}, want: false},
-		{name: "obvious_cbor_map", data: []byte{0xa1, 0x61, 0x61, 0x01}, want: false}, // {"a":1} in CBOR
+		{name: "obvious_cbor_map", data: []byte{0xa1, 0x61, 0x61, 0x01}, want: false},   // {"a":1} in CBOR
 		{name: "obvious_cbor_array", data: []byte{0x83, 0x01, 0x02, 0x03}, want: false}, // [1,2,3]
 	}
 
@@ -34,4 +34,3 @@ func TestIsLikelyJSON_Classification(t *testing.T) {
 		})
 	}
 }
-

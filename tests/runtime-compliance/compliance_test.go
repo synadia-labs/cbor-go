@@ -3,6 +3,8 @@ package tests
 import (
 	"encoding/hex"
 	"errors"
+	"fmt"
+	"math"
 	"testing"
 
 	cbor "github.com/synadia-labs/cbor-go/runtime"
@@ -198,6 +200,17 @@ func TestMaxContainerLen(t *testing.T) {
 	r.SetMaxContainerLen(2)
 	if _, err := r.ReadMapHeader(); !errors.Is(err, cbor.ErrContainerTooLarge) {
 		t.Fatalf("expected ErrContainerTooLarge for map, got %v", err)
+	}
+}
+
+// TestReadBytesUint64LengthShort ensures large uint64 byte lengths
+// fail cleanly instead of panicking.
+func TestReadBytesUint64LengthShort(t *testing.T) {
+	// Byte string with uint64 length math.MaxInt64 and no payload.
+	b := mustHex(t, fmt.Sprintf("5b%016x", uint64(math.MaxInt64)))
+	r := cbor.NewReaderBytes(b)
+	if _, err := r.ReadBytes(); !errors.Is(err, cbor.ErrShortBytes) {
+		t.Fatalf("expected ErrShortBytes for oversized byte string, got %v", err)
 	}
 }
 

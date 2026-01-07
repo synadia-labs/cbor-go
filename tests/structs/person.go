@@ -8,4 +8,3 @@ type Person struct {
 	Age  int    `cbor:"age,omitempty"`
 	Data []byte `cbor:"data"`
 }
-

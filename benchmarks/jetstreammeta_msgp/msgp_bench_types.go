@@ -25,13 +25,13 @@ type MsgpWriteableStreamAssignment struct {
 }
 
 type MsgpWriteableConsumerAssignment struct {
-	Client     *MsgpClientInfo       `msg:"client,omitempty"`
-	Created    int64                 `msg:"created"`
-	Name       string                `msg:"name"`
-	Stream     string                `msg:"stream"`
-	ConfigJSON []byte                `msg:"consumer"`
-	Group      *MsgpRaftGroup        `msg:"group"`
-	State      *MsgpConsumerState    `msg:"state,omitempty"`
+	Client     *MsgpClientInfo    `msg:"client,omitempty"`
+	Created    int64              `msg:"created"`
+	Name       string             `msg:"name"`
+	Stream     string             `msg:"stream"`
+	ConfigJSON []byte             `msg:"consumer"`
+	Group      *MsgpRaftGroup     `msg:"group"`
+	State      *MsgpConsumerState `msg:"state,omitempty"`
 }
 
 type MsgpClientInfo struct {
@@ -158,4 +158,3 @@ func toMsgpState(cs *js.ConsumerState) *MsgpConsumerState {
 	}
 	return ms
 }
-

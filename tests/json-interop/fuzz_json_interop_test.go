@@ -55,4 +55,3 @@ func FuzzJSONInterop(f *testing.F) {
 		_, _, _ = cbor.ToJSONBytes(b)
 	})
 }
-

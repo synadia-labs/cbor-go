@@ -439,4 +439,3 @@ func encodeBase64RawURL(buf *ByteBuffer, src []byte) {
 	out := buf.Extend(base64.RawURLEncoding.EncodedLen(len(src)))
 	base64.RawURLEncoding.Encode(out, src)
 }
-

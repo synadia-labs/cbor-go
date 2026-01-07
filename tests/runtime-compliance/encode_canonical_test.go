@@ -9,63 +9,63 @@ import (
 
 func TestCanonicalIntEncoding(t *testing.T) {
 	cases := []struct {
-		name   string
-		build  func() []byte
+		name    string
+		build   func() []byte
 		wantHex string
 	}{
 		{
-			name: "int_0",
-			build: func() []byte { return cbor.AppendInt64(nil, 0) },
+			name:    "int_0",
+			build:   func() []byte { return cbor.AppendInt64(nil, 0) },
 			wantHex: "00",
 		},
 		{
-			name: "int_1",
-			build: func() []byte { return cbor.AppendInt64(nil, 1) },
+			name:    "int_1",
+			build:   func() []byte { return cbor.AppendInt64(nil, 1) },
 			wantHex: "01",
 		},
 		{
-			name: "int_10",
-			build: func() []byte { return cbor.AppendInt64(nil, 10) },
+			name:    "int_10",
+			build:   func() []byte { return cbor.AppendInt64(nil, 10) },
 			wantHex: "0a",
 		},
 		{
-			name: "int_23",
-			build: func() []byte { return cbor.AppendInt64(nil, 23) },
+			name:    "int_23",
+			build:   func() []byte { return cbor.AppendInt64(nil, 23) },
 			wantHex: "17",
 		},
 		{
-			name: "int_24",
-			build: func() []byte { return cbor.AppendInt64(nil, 24) },
+			name:    "int_24",
+			build:   func() []byte { return cbor.AppendInt64(nil, 24) },
 			wantHex: "1818",
 		},
 		{
-			name: "int_255",
-			build: func() []byte { return cbor.AppendInt64(nil, 255) },
+			name:    "int_255",
+			build:   func() []byte { return cbor.AppendInt64(nil, 255) },
 			wantHex: "18ff",
 		},
 		{
-			name: "int_256",
-			build: func() []byte { return cbor.AppendInt64(nil, 256) },
+			name:    "int_256",
+			build:   func() []byte { return cbor.AppendInt64(nil, 256) },
 			wantHex: "190100",
 		},
 		{
-			name: "neg_1",
-			build: func() []byte { return cbor.AppendInt64(nil, -1) },
+			name:    "neg_1",
+			build:   func() []byte { return cbor.AppendInt64(nil, -1) },
 			wantHex: "20",
 		},
 		{
-			name: "neg_10",
-			build: func() []byte { return cbor.AppendInt64(nil, -10) },
+			name:    "neg_10",
+			build:   func() []byte { return cbor.AppendInt64(nil, -10) },
 			wantHex: "29",
 		},
 		{
-			name: "neg_24",
-			build: func() []byte { return cbor.AppendInt64(nil, -24) },
+			name:    "neg_24",
+			build:   func() []byte { return cbor.AppendInt64(nil, -24) },
 			wantHex: "37",
 		},
 		{
-			name: "neg_25",
-			build: func() []byte { return cbor.AppendInt64(nil, -25) },
+			name:    "neg_25",
+			build:   func() []byte { return cbor.AppendInt64(nil, -25) },
 			wantHex: "3818",
 		},
 	}
@@ -96,4 +96,3 @@ func TestCanonicalFloatEncoding(t *testing.T) {
 		t.Fatalf("1/3 not encoded as float64, got %x", b)
 	}
 }
-

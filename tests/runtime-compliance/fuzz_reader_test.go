@@ -59,4 +59,3 @@ func FuzzRuntimeReaderBasic(f *testing.F) {
 		}
 	})
 }
-

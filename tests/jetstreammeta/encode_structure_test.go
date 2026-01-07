@@ -42,4 +42,3 @@ func TestGeneratedMarshalCBOR_NoAppendInterface(t *testing.T) {
 	checkNoAppendInterface("WriteableConsumerAssignment")
 	checkNoAppendInterface("ConsumerState")
 }
-

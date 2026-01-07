@@ -56,4 +56,3 @@ func TestCBORSequenceBytesHelpers(t *testing.T) {
 		t.Fatalf("ForEachSequenceBytes expected 2 items, got %d", i)
 	}
 }
-

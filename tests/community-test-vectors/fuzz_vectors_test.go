@@ -53,4 +53,3 @@ func FuzzCommunityVectors(f *testing.F) {
 		_, _, _ = cbor.DiagBytes(data)
 	})
 }
-

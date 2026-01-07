@@ -23,6 +23,10 @@ func readUintCore(b []byte, expectedMajor uint8) (uint64, []byte, error) {
 	}
 
 	addInfo := getAddInfo(b[0])
+	// Additional info values 28, 29, 30 are reserved by RFC 8949.
+	if addInfo >= 28 && addInfo <= 30 {
+		return 0, b, InvalidAdditionalInfoError{Major: expectedMajor, Info: addInfo}
+	}
 
 	switch {
 	case addInfo <= addInfoDirect:
@@ -506,13 +510,14 @@ func ReadBytesBytes(b []byte, scratch []byte) (v []byte, o []byte, err error) {
 			return nil, b, UintOverflow{Value: u64, FailedBitsize: 64}
 		}
 		sz := int(u64)
-		if len(b) < 9+sz {
+		if sz < 0 || sz > len(b)-9 {
 			return nil, b, ErrShortBytes
 		}
 		if sz == 0 {
 			return scratch[:0], b[9:], nil
 		}
-		return b[9 : 9+sz], b[9+sz:], nil
+		end := 9 + sz
+		return b[9:end], b[end:], nil
 	default:
 		sz, o, err := readUintCore(b, majorTypeBytes)
 		if err != nil {
@@ -535,6 +540,10 @@ func ReadStringZC(b []byte) (v []byte, o []byte, err error) {
 	}
 
 	lead := b[0]
+	addInfo := getAddInfo(lead)
+	if addInfo >= 28 && addInfo <= 30 {
+		return nil, b, InvalidAdditionalInfoError{Major: majorTypeText, Info: addInfo}
+	}
 
 	// Ultra-fast path for length 0-23
 	if lead >= 0x60 && lead <= 0x77 {
@@ -662,6 +671,9 @@ func ReadSimpleValue(b []byte) (val uint8, o []byte, err error) {
 		return 0, b, badPrefix(major, majorTypeSimple)
 	}
 	addInfo := getAddInfo(b[0])
+	if addInfo >= 28 && addInfo <= 30 {
+		return 0, b, InvalidAdditionalInfoError{Major: majorTypeSimple, Info: addInfo}
+	}
 	switch addInfo {
 	case simpleFloat16, simpleFloat32, simpleFloat64:
 		return 0, b, &ErrUnsupportedType{}
@@ -1293,14 +1305,14 @@ func ReadOrderedMapBytes(b []byte) (pairs []RawPair, o []byte, err error) {
 
 // float16BitsToFloat32 converts IEEE 754 binary16 bits to float32
 func float16BitsToFloat32(h uint16) float32 {
-	sign := uint32(h>>15) & 0x1
-	exp := (h >> 10) & 0x1F
-	mant := uint32(h & 0x03FF)
+	sign := uint32(h>>float16SignShift) & 0x1
+	exp := (h >> float16ExpShift) & float16ExpMask
+	mant := uint32(h & float16MantMask)
 	var bits uint32
 	switch exp {
 	case 0:
 		if mant == 0 {
-			bits = sign << 31
+			bits = sign << float32SignShift
 		} else {
 			// subnormal: value = mant / 2^10 * 2^-14 = mant * 2^-24
 			// Build float by arithmetic
@@ -1310,16 +1322,16 @@ func float16BitsToFloat32(h uint16) float32 {
 			}
 			return float32(f)
 		}
-	case 0x1F:
+	case float16ExpMask:
 		// Inf/NaN
-		bits = (sign << 31) | (0xFF << 23)
+		bits = (sign << float32SignShift) | (float32ExpMask << float32ExpShift)
 		if mant != 0 {
-			bits |= (mant << 13)
+			bits |= (mant << float32ToFloat16MantShift)
 		}
 	default:
 		// normalized
-		e32 := int(exp) - 15 + 127
-		bits = (sign << 31) | (uint32(e32) << 23) | (mant << 13)
+		e32 := int(exp) - float16ExpBias + float32ExpBias
+		bits = (sign << float32SignShift) | (uint32(e32) << float32ExpShift) | (mant << float32ToFloat16MantShift)
 	}
 	return math.Float32frombits(bits)
 }

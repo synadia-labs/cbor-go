@@ -39,25 +39,25 @@ var nestedDecoders = []nestedDecoder{
 
 func TestScalarsRoundTripSafeAndTrusted(t *testing.T) {
 	orig := &Scalars{
-		S:    "hello",
-		B:    true,
-		I:    -1,
-		I8:   -8,
-		I16:  -16,
-		I32:  -32,
-		I64:  -64,
-		U:    1,
-		U8:   8,
-		U16:  16,
-		U32:  32,
-		U64:  64,
-		F32:  1.5,
-		F64:  2.5,
-		Data: []byte{1, 2, 3, 4},
-		T:    time.Unix(123456789, 0).UTC(),
-		D:    5 * time.Second,
-		Ints: []int{1, 2, 3},
-		Names: []string{"a", "b"},
+		S:      "hello",
+		B:      true,
+		I:      -1,
+		I8:     -8,
+		I16:    -16,
+		I32:    -32,
+		I64:    -64,
+		U:      1,
+		U8:     8,
+		U16:    16,
+		U32:    32,
+		U64:    64,
+		F32:    1.5,
+		F64:    2.5,
+		Data:   []byte{1, 2, 3, 4},
+		T:      time.Unix(123456789, 0).UTC(),
+		D:      5 * time.Second,
+		Ints:   []int{1, 2, 3},
+		Names:  []string{"a", "b"},
 		Scores: map[string]int{"alice": 10, "bob": 20},
 	}
 
@@ -85,25 +85,40 @@ func TestScalarsRoundTripSafeAndTrusted(t *testing.T) {
 }
 
 func equalInts(a, b []int) bool {
-	if len(a) != len(b) { return false }
-	for i := range a { if a[i] != b[i] { return false } }
-	return true
-}
-
-func equalStrings(a, b []string) bool {
-	if len(a) != len(b) { return false }
-	for i := range a { if a[i] != b[i] { return false } }
-	return true
-}
-
-func equalIntMap(a, b map[string]int) bool {
-	if len(a) != len(b) { return false }
-	for k, v := range a {
-		if b[k] != v { return false }
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
 	}
 	return true
 }
 
+func equalStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func equalIntMap(a, b map[string]int) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		if b[k] != v {
+			return false
+		}
+	}
+	return true
+}
 
 func TestNestedRoundTripSafeAndTrusted(t *testing.T) {
 	orig := &Nested{

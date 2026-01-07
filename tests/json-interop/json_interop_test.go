@@ -185,17 +185,17 @@ func TestJSONInterop_NestedWrappers(t *testing.T) {
 	}{
 		{
 			name: "array_of_wrappers",
-			js: `[{"$uuid":"00112233-4455-6677-8899-aabbccddeeff"},{"$base64":"QUJD"}]`,
+			js:   `[{"$uuid":"00112233-4455-6677-8899-aabbccddeeff"},{"$base64":"QUJD"}]`,
 			want: `[{"$uuid":"00112233-4455-6677-8899-aabbccddeeff"},{"$base64":"QUJD"}]`,
 		},
 		{
 			name: "map_of_wrappers",
-			js: `{"u":{"$uuid":"00112233-4455-6677-8899-aabbccddeeff"},"b":{"$base64":"QUJD"}}`,
+			js:   `{"u":{"$uuid":"00112233-4455-6677-8899-aabbccddeeff"},"b":{"$base64":"QUJD"}}`,
 			want: `{"u":{"$uuid":"00112233-4455-6677-8899-aabbccddeeff"},"b":{"$base64":"QUJD"}}`,
 		},
 		{
 			name: "mixed_time_and_bytes",
-			js: `{"t":{"$rfc3339":"2024-01-02T03:04:05Z"},"d":{"$decimal":[-2,"12345"]}}`,
+			js:   `{"t":{"$rfc3339":"2024-01-02T03:04:05Z"},"d":{"$decimal":[-2,"12345"]}}`,
 			want: `{"t":"2024-01-02T03:04:05Z","d":{"$decimal":[-2,"12345"]}}`,
 		},
 	}

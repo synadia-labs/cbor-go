@@ -2,7 +2,7 @@ version: '3'
 
 vars:
   VECTORS_DIR: tests/community-test-vectors
-  VERSION: 0.0.2
+  VERSION: 0.0.3
 
 tasks:
   version:

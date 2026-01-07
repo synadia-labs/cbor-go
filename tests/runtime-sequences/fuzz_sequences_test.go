@@ -35,4 +35,3 @@ func FuzzCBORSequences(f *testing.F) {
 		})
 	})
 }
-

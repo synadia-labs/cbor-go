@@ -6,10 +6,10 @@ import (
 	"encoding/json"
 	"math"
 	bigmath "math/big"
+	"reflect"
 	"regexp"
 	"sort"
 	"time"
-	"reflect"
 )
 
 // ensure 'sz' extra bytes in 'b' btw len(b) and cap(b)
@@ -64,7 +64,7 @@ func AppendArrayHeader(b []byte, sz uint32) []byte {
 
 // AppendArrayHeaderIndefinite appends an indefinite-length array header (0x9f)
 func AppendArrayHeaderIndefinite(b []byte) []byte {
-    return append(b, makeByte(majorTypeArray, addInfoIndefinite))
+	return append(b, makeByte(majorTypeArray, addInfoIndefinite))
 }
 
 // AppendNil appends a nil value
@@ -74,14 +74,18 @@ func AppendNil(b []byte) []byte {
 
 // AppendUndefined appends an undefined simple value (23)
 func AppendUndefined(b []byte) []byte {
-    return append(b, makeByte(majorTypeSimple, simpleUndefined))
+	return append(b, makeByte(majorTypeSimple, simpleUndefined))
 }
 
 // AppendTextHeaderIndefinite appends an indefinite-length text string header (0x7f)
-func AppendTextHeaderIndefinite(b []byte) []byte { return append(b, makeByte(majorTypeText, addInfoIndefinite)) }
+func AppendTextHeaderIndefinite(b []byte) []byte {
+	return append(b, makeByte(majorTypeText, addInfoIndefinite))
+}
 
 // AppendBytesHeaderIndefinite appends an indefinite-length byte string header (0x5f)
-func AppendBytesHeaderIndefinite(b []byte) []byte { return append(b, makeByte(majorTypeBytes, addInfoIndefinite)) }
+func AppendBytesHeaderIndefinite(b []byte) []byte {
+	return append(b, makeByte(majorTypeBytes, addInfoIndefinite))
+}
 
 // AppendTextChunk appends a definite-length text string chunk (use within indefinite text)
 func AppendTextChunk(b []byte, s string) []byte { return AppendString(b, s) }
@@ -107,23 +111,25 @@ func AppendFloat32(b []byte, f float32) []byte {
 
 // AppendFloatCanonical appends the shortest-width float (f16/f32/f64) that preserves the value.
 func AppendFloatCanonical(b []byte, f float64) []byte {
-    // Normalize -0 to +0 for canonical
-    if f == 0 && math.Signbit(f) { f = 0 }
-    // NaN: canonicalize to float16 NaN
-    if math.IsNaN(f) {
-        return AppendFloat16(b, float32(f))
-    }
-    // Try f16
-    f16 := float32ToFloat16Bits(float32(f))
-    if float64(float16BitsToFloat32(f16)) == f {
-        return AppendFloat16(b, float32(f))
-    }
-    // Try f32
-    f32 := float32(f)
-    if float64(f32) == f {
-        return AppendFloat32(b, f32)
-    }
-    return AppendFloat64(b, f)
+	// Normalize -0 to +0 for canonical
+	if f == 0 && math.Signbit(f) {
+		f = 0
+	}
+	// NaN: canonicalize to float16 NaN
+	if math.IsNaN(f) {
+		return AppendFloat16(b, float32(f))
+	}
+	// Try f16
+	f16 := float32ToFloat16Bits(float32(f))
+	if float64(float16BitsToFloat32(f16)) == f {
+		return AppendFloat16(b, float32(f))
+	}
+	// Try f32
+	f32 := float32(f)
+	if float64(f32) == f {
+		return AppendFloat32(b, f32)
+	}
+	return AppendFloat64(b, f)
 }
 
 // AppendFloat16 appends a float16 (IEEE 754 binary16) encoded value
@@ -219,92 +225,92 @@ func AppendUint32(b []byte, u uint32) []byte {
 
 // AppendBytes appends a byte string
 func AppendBytes(b []byte, data []byte) []byte {
-    sz := uint64(len(data))
-    // Compute header size and reserve in one shot to avoid double ensure + copy
-    var h int
-    switch {
-    case sz <= addInfoDirect:
-        h = 1
-    case sz <= math.MaxUint8:
-        h = 2
-    case sz <= math.MaxUint16:
-        h = 3
-    case sz <= math.MaxUint32:
-        h = 5
-    default:
-        h = 9
-    }
-    o, n := ensure(b, h+int(sz))
-    // Write header
-    switch h {
-    case 1:
-        o[n] = makeByte(majorTypeBytes, uint8(sz))
-        n++
-    case 2:
-        o[n] = makeByte(majorTypeBytes, addInfoUint8)
-        o[n+1] = uint8(sz)
-        n += 2
-    case 3:
-        o[n] = makeByte(majorTypeBytes, addInfoUint16)
-        binary.BigEndian.PutUint16(o[n+1:], uint16(sz))
-        n += 3
-    case 5:
-        o[n] = makeByte(majorTypeBytes, addInfoUint32)
-        binary.BigEndian.PutUint32(o[n+1:], uint32(sz))
-        n += 5
-    case 9:
-        o[n] = makeByte(majorTypeBytes, addInfoUint64)
-        binary.BigEndian.PutUint64(o[n+1:], sz)
-        n += 9
-    }
-    // Copy payload
-    copy(o[n:], data)
-    return o[:n+int(sz)]
+	sz := uint64(len(data))
+	// Compute header size and reserve in one shot to avoid double ensure + copy
+	var h int
+	switch {
+	case sz <= addInfoDirect:
+		h = 1
+	case sz <= math.MaxUint8:
+		h = 2
+	case sz <= math.MaxUint16:
+		h = 3
+	case sz <= math.MaxUint32:
+		h = 5
+	default:
+		h = 9
+	}
+	o, n := ensure(b, h+int(sz))
+	// Write header
+	switch h {
+	case 1:
+		o[n] = makeByte(majorTypeBytes, uint8(sz))
+		n++
+	case 2:
+		o[n] = makeByte(majorTypeBytes, addInfoUint8)
+		o[n+1] = uint8(sz)
+		n += 2
+	case 3:
+		o[n] = makeByte(majorTypeBytes, addInfoUint16)
+		binary.BigEndian.PutUint16(o[n+1:], uint16(sz))
+		n += 3
+	case 5:
+		o[n] = makeByte(majorTypeBytes, addInfoUint32)
+		binary.BigEndian.PutUint32(o[n+1:], uint32(sz))
+		n += 5
+	case 9:
+		o[n] = makeByte(majorTypeBytes, addInfoUint64)
+		binary.BigEndian.PutUint64(o[n+1:], sz)
+		n += 9
+	}
+	// Copy payload
+	copy(o[n:], data)
+	return o[:n+int(sz)]
 }
 
 // AppendString appends a text string
 func AppendString(b []byte, s string) []byte {
-    sz := uint64(len(s))
-    // Compute header size and reserve once
-    var h int
-    switch {
-    case sz <= addInfoDirect:
-        h = 1
-    case sz <= math.MaxUint8:
-        h = 2
-    case sz <= math.MaxUint16:
-        h = 3
-    case sz <= math.MaxUint32:
-        h = 5
-    default:
-        h = 9
-    }
-    o, n := ensure(b, h+int(sz))
-    // Write header
-    switch h {
-    case 1:
-        o[n] = makeByte(majorTypeText, uint8(sz))
-        n++
-    case 2:
-        o[n] = makeByte(majorTypeText, addInfoUint8)
-        o[n+1] = uint8(sz)
-        n += 2
-    case 3:
-        o[n] = makeByte(majorTypeText, addInfoUint16)
-        binary.BigEndian.PutUint16(o[n+1:], uint16(sz))
-        n += 3
-    case 5:
-        o[n] = makeByte(majorTypeText, addInfoUint32)
-        binary.BigEndian.PutUint32(o[n+1:], uint32(sz))
-        n += 5
-    case 9:
-        o[n] = makeByte(majorTypeText, addInfoUint64)
-        binary.BigEndian.PutUint64(o[n+1:], sz)
-        n += 9
-    }
-    // Copy payload
-    copy(o[n:], s)
-    return o[:n+int(sz)]
+	sz := uint64(len(s))
+	// Compute header size and reserve once
+	var h int
+	switch {
+	case sz <= addInfoDirect:
+		h = 1
+	case sz <= math.MaxUint8:
+		h = 2
+	case sz <= math.MaxUint16:
+		h = 3
+	case sz <= math.MaxUint32:
+		h = 5
+	default:
+		h = 9
+	}
+	o, n := ensure(b, h+int(sz))
+	// Write header
+	switch h {
+	case 1:
+		o[n] = makeByte(majorTypeText, uint8(sz))
+		n++
+	case 2:
+		o[n] = makeByte(majorTypeText, addInfoUint8)
+		o[n+1] = uint8(sz)
+		n += 2
+	case 3:
+		o[n] = makeByte(majorTypeText, addInfoUint16)
+		binary.BigEndian.PutUint16(o[n+1:], uint16(sz))
+		n += 3
+	case 5:
+		o[n] = makeByte(majorTypeText, addInfoUint32)
+		binary.BigEndian.PutUint32(o[n+1:], uint32(sz))
+		n += 5
+	case 9:
+		o[n] = makeByte(majorTypeText, addInfoUint64)
+		binary.BigEndian.PutUint64(o[n+1:], sz)
+		n += 9
+	}
+	// Copy payload
+	copy(o[n:], s)
+	return o[:n+int(sz)]
 }
 
 // AppendStringFromBytes appends a string from bytes
@@ -363,20 +369,20 @@ func AppendTagged(b []byte, tag uint64, value []byte) []byte {
 
 // AppendRFC3339Time appends a tag(0) RFC3339 datetime string
 func AppendRFC3339Time(b []byte, t time.Time) []byte {
-    b = AppendTag(b, tagDateTimeString)
-    return AppendString(b, t.Format(time.RFC3339Nano))
+	b = AppendTag(b, tagDateTimeString)
+	return AppendString(b, t.Format(time.RFC3339Nano))
 }
 
 // AppendBase64URLString appends tag(33) with a base64url text string payload
 func AppendBase64URLString(b []byte, s string) []byte {
-    b = AppendTag(b, tagBase64URLString)
-    return AppendString(b, s)
+	b = AppendTag(b, tagBase64URLString)
+	return AppendString(b, s)
 }
 
 // AppendBase64String appends tag(34) with a base64 text string payload
 func AppendBase64String(b []byte, s string) []byte {
-    b = AppendTag(b, tagBase64String)
-    return AppendString(b, s)
+	b = AppendTag(b, tagBase64String)
+	return AppendString(b, s)
 }
 
 // AppendURI appends a tag(32) URI text string
@@ -393,33 +399,33 @@ func AppendEmbeddedCBOR(b []byte, payload []byte) []byte {
 
 // AppendUUID appends tag(37) with a 16-byte UUID (RFC 4122) as byte string
 func AppendUUID(b []byte, uuid [16]byte) []byte {
-    b = AppendTag(b, 37)
-    return AppendBytes(b, uuid[:])
+	b = AppendTag(b, 37)
+	return AppendBytes(b, uuid[:])
 }
 
 // AppendRegexpString appends tag(35) with a regular expression pattern as text
 func AppendRegexpString(b []byte, re string) []byte {
-    b = AppendTag(b, tagRegexp)
-    return AppendString(b, re)
+	b = AppendTag(b, tagRegexp)
+	return AppendString(b, re)
 }
 
 // AppendMIMEString appends tag(36) with a MIME message as text
 func AppendMIMEString(b []byte, mime string) []byte {
-    b = AppendTag(b, tagMIME)
-    return AppendString(b, mime)
+	b = AppendTag(b, tagMIME)
+	return AppendString(b, mime)
 }
 
 // AppendSelfDescribeCBOR appends the self-describe CBOR tag (0xd9d9f7)
 func AppendSelfDescribeCBOR(b []byte) []byte {
-    return appendUintCore(b, majorTypeTag, tagSelfDescribeCBOR)
+	return appendUintCore(b, majorTypeTag, tagSelfDescribeCBOR)
 }
 
 // AppendRegexp appends tag(35) from a compiled *regexp.Regexp
 func AppendRegexp(b []byte, re *regexp.Regexp) []byte {
-    if re == nil {
-        return AppendNil(b)
-    }
-    return AppendRegexpString(b, re.String())
+	if re == nil {
+		return AppendNil(b)
+	}
+	return AppendRegexpString(b, re.String())
 }
 
 // AppendBigInt appends a big integer using bignum tags (2 positive, 3 negative)
@@ -491,18 +497,18 @@ func AppendBase16(b []byte, data []byte) []byte {
 // float32ToFloat16Bits converts float32 to IEEE 754 binary16 representation (round to nearest even)
 func float32ToFloat16Bits(f float32) uint16 {
 	bits := math.Float32bits(f)
-	sign := uint16((bits >> 31) & 0x1)
-	exp := int((bits >> 23) & 0xFF)
-	mant := bits & 0x7FFFFF
+	sign := uint16((bits >> float32SignShift) & 0x1)
+	exp := (bits >> float32ExpShift) & float32ExpMask
+	mant := bits & float32MantMask
 
 	var h uint16
 	switch exp {
-	case 0xFF: // NaN or Inf
+	case float32ExpMask: // NaN or Inf
 		if mant == 0 {
-			h = (0x1F << 10) // Inf
+			h = (float16ExpMask << float16ExpShift) // Inf
 		} else {
-			h = (0x1F << 10) | uint16(mant>>13)
-			if h&0x03FF == 0 { // ensure NaN payload
+			h = (float16ExpMask << float16ExpShift) | uint16(mant>>float32ToFloat16MantShift)
+			if h&float16MantMask == 0 { // ensure NaN payload
 				h |= 1
 			}
 		}
@@ -511,46 +517,46 @@ func float32ToFloat16Bits(f float32) uint16 {
 		h = 0
 	default:
 		// Normalized number
-		// Unbias exponent: e32 = exp-127; target e16 = e32 + 15
-		e32 := exp - 127
-		e16 := e32 + 15
-		if e16 >= 0x1F { // overflow => Inf
-			h = (0x1F << 10)
+		// Unbias exponent: e32 = exp-float32ExpBias; target e16 = e32 + float16ExpBias
+		e32 := int(exp) - float32ExpBias
+		e16 := e32 + float16ExpBias
+		if e16 >= int(float16ExpMask) { // overflow => Inf
+			h = (float16ExpMask << float16ExpShift)
 		} else if e16 <= 0 { // subnormal or underflow
-			// subnormal half: significand = (mant | 1<<23) >> (1 - e16 + 13)
-			// shift = 14 - e32 = 14 - (exp-127) = 141 - exp
-			shift := 14 - e32
-			if shift > 24 { // too small => zero
+			// subnormal half: significand = (mant | 1<<float32MantBits) >> (1 - e16 + float32ToFloat16MantShift)
+			// shift = (float16ExpBias - 1) - e32 = (float16ExpBias - 1) - (exp-float32ExpBias)
+			shift := (float16ExpBias - 1) - e32
+			if shift > float32MantBits+1 { // too small => zero
 				h = 0
 			} else {
-				mantissa := (mant | 1<<23)
+				mantissa := (mant | float32HiddenBit)
 				// add rounding bias before shifting to 10 bits
 				round := uint32(1) << (shift - 1)
-				val := uint32(mantissa)
+				val := mantissa
 				val += round - 1 + ((val >> (shift)) & 1) // round to even
 				frac := uint16(val >> shift)
-				h = frac & 0x03FF
+				h = frac & float16MantMask
 			}
 		} else {
 			// normal half
 			// round mantissa from 23 to 10 bits
 			mantR := mant
-			round := uint32(1) << 12
-			val := mantR + round - 1 + ((mantR >> 13) & 1)
-			frac := uint16(val >> 13)
-			h = (uint16(e16) << 10) | (frac & 0x03FF)
-			if frac>>10 != 0 { // mantissa overflow rounded up exponent
+			round := uint32(1) << float32ToFloat16RoundShift
+			val := mantR + round - 1 + ((mantR >> float32ToFloat16MantShift) & 1)
+			frac := uint16(val >> float32ToFloat16MantShift)
+			h = (uint16(e16) << float16ExpShift) | (frac & float16MantMask)
+			if frac>>float16MantBits != 0 { // mantissa overflow rounded up exponent
 				// carry into exponent
 				e16++
-				if e16 >= 0x1F {
-					h = (0x1F << 10)
+				if e16 >= int(float16ExpMask) {
+					h = (float16ExpMask << float16ExpShift)
 				} else {
-					h = (uint16(e16) << 10)
+					h = (uint16(e16) << float16ExpShift)
 				}
 			}
 		}
 	}
-	return (sign << 15) | h
+	return (sign << float16SignShift) | h
 }
 
 // AppendMapStrStr appends a map[string]string
@@ -710,51 +716,75 @@ func AppendInterface(b []byte, i any) ([]byte, error) {
 		return AppendDuration(b, v), nil
 	case []int:
 		b = AppendArrayHeader(b, uint32(len(v)))
-		for _, elem := range v { b = AppendInt(b, elem) }
+		for _, elem := range v {
+			b = AppendInt(b, elem)
+		}
 		return b, nil
 	case []int8:
 		b = AppendArrayHeader(b, uint32(len(v)))
-		for _, elem := range v { b = AppendInt8(b, elem) }
+		for _, elem := range v {
+			b = AppendInt8(b, elem)
+		}
 		return b, nil
 	case []int16:
 		b = AppendArrayHeader(b, uint32(len(v)))
-		for _, elem := range v { b = AppendInt16(b, elem) }
+		for _, elem := range v {
+			b = AppendInt16(b, elem)
+		}
 		return b, nil
 	case []int32:
 		b = AppendArrayHeader(b, uint32(len(v)))
-		for _, elem := range v { b = AppendInt32(b, elem) }
+		for _, elem := range v {
+			b = AppendInt32(b, elem)
+		}
 		return b, nil
 	case []int64:
 		b = AppendArrayHeader(b, uint32(len(v)))
-		for _, elem := range v { b = AppendInt64(b, elem) }
+		for _, elem := range v {
+			b = AppendInt64(b, elem)
+		}
 		return b, nil
 	case []uint:
 		b = AppendArrayHeader(b, uint32(len(v)))
-		for _, elem := range v { b = AppendUint(b, elem) }
+		for _, elem := range v {
+			b = AppendUint(b, elem)
+		}
 		return b, nil
 	case []uint16:
 		b = AppendArrayHeader(b, uint32(len(v)))
-		for _, elem := range v { b = AppendUint16(b, elem) }
+		for _, elem := range v {
+			b = AppendUint16(b, elem)
+		}
 		return b, nil
 	case []uint32:
 		b = AppendArrayHeader(b, uint32(len(v)))
-		for _, elem := range v { b = AppendUint32(b, elem) }
+		for _, elem := range v {
+			b = AppendUint32(b, elem)
+		}
 		return b, nil
 	case []uint64:
 		b = AppendArrayHeader(b, uint32(len(v)))
-		for _, elem := range v { b = AppendUint64(b, elem) }
+		for _, elem := range v {
+			b = AppendUint64(b, elem)
+		}
 		return b, nil
 	case []float32:
 		b = AppendArrayHeader(b, uint32(len(v)))
-		for _, elem := range v { b = AppendFloat32(b, elem) }
+		for _, elem := range v {
+			b = AppendFloat32(b, elem)
+		}
 		return b, nil
 	case []float64:
 		b = AppendArrayHeader(b, uint32(len(v)))
-		for _, elem := range v { b = AppendFloat64(b, elem) }
+		for _, elem := range v {
+			b = AppendFloat64(b, elem)
+		}
 		return b, nil
 	case []string:
 		b = AppendArrayHeader(b, uint32(len(v)))
-		for _, elem := range v { b = AppendString(b, elem) }
+		for _, elem := range v {
+			b = AppendString(b, elem)
+		}
 		return b, nil
 	case map[string]int:
 		b = AppendMapHeader(b, uint32(len(v)))
@@ -951,65 +981,79 @@ func AppendMapHeaderIndefinite(b []byte) []byte {
 
 // AppendBreak appends a break stop code (0xff)
 func AppendBreak(b []byte) []byte {
-    return append(b, makeByte(majorTypeSimple, simpleBreak))
+	return append(b, makeByte(majorTypeSimple, simpleBreak))
 }
 
 // AppendRawMapDeterministic appends a map with entries provided as raw CBOR key/value pairs.
 // Pairs are sorted by CBOR-encoded key bytes to ensure RFC 8949 deterministic order.
 func AppendRawMapDeterministic(b []byte, pairs []RawPair) []byte {
-    // Deterministic order: by encoded key length, then bytewise lexicographic.
-    n := len(pairs)
-    if n == 0 {
-        return AppendMapHeader(b, 0)
-    }
-    // Bucket indices by key length.
-    byLen := make(map[int][]int)
-    for i := 0; i < n; i++ {
-        l := len(pairs[i].Key)
-        byLen[l] = append(byLen[l], i)
-    }
-    lens := make([]int, 0, len(byLen))
-    for l := range byLen { lens = append(lens, l) }
-    sort.Ints(lens)
-    order := make([]int, 0, n)
-    counts := make([]int, 256)
-    var tmp []int
-    for _, l := range lens {
-        grp := byLen[l]
-        if len(grp) <= 1 {
-            order = append(order, grp...)
-            continue
-        }
-        // Adaptive: comparator is faster for smaller groups/short keys.
-        if l < 64 && len(grp) < 1024 {
-            sort.Slice(grp, func(i, j int) bool { return bytes.Compare(pairs[grp[i]].Key, pairs[grp[j]].Key) < 0 })
-            order = append(order, grp...)
-            continue
-        }
-        if cap(tmp) < len(grp) { tmp = make([]int, len(grp)) } else { tmp = tmp[:len(grp)] }
-        cur := grp
-        aux := tmp
-        for pos := l - 1; pos >= 0; pos-- {
-            for i := range counts { counts[i] = 0 }
-            for _, idx := range cur { counts[int(pairs[idx].Key[pos])]++ }
-            sum := 0
-            for i := 0; i < 256; i++ { c := counts[i]; counts[i] = sum; sum += c }
-            for _, idx := range cur {
-                bv := pairs[idx].Key[pos]
-                p := counts[int(bv)]
-                aux[p] = idx
-                counts[int(bv)] = p + 1
-            }
-            cur, aux = aux, cur
-        }
-        order = append(order, cur...)
-    }
-    b = AppendMapHeader(b, uint32(n))
-    for _, i := range order {
-        b = append(b, pairs[i].Key...)
-        b = append(b, pairs[i].Value...)
-    }
-    return b
+	// Deterministic order: by encoded key length, then bytewise lexicographic.
+	n := len(pairs)
+	if n == 0 {
+		return AppendMapHeader(b, 0)
+	}
+	// Bucket indices by key length.
+	byLen := make(map[int][]int)
+	for i := 0; i < n; i++ {
+		l := len(pairs[i].Key)
+		byLen[l] = append(byLen[l], i)
+	}
+	lens := make([]int, 0, len(byLen))
+	for l := range byLen {
+		lens = append(lens, l)
+	}
+	sort.Ints(lens)
+	order := make([]int, 0, n)
+	counts := make([]int, byteValueCount)
+	var tmp []int
+	for _, l := range lens {
+		grp := byLen[l]
+		if len(grp) <= 1 {
+			order = append(order, grp...)
+			continue
+		}
+		// Adaptive: comparator is faster for smaller groups/short keys.
+		if l < 64 && len(grp) < 1024 {
+			sort.Slice(grp, func(i, j int) bool { return bytes.Compare(pairs[grp[i]].Key, pairs[grp[j]].Key) < 0 })
+			order = append(order, grp...)
+			continue
+		}
+		if cap(tmp) < len(grp) {
+			tmp = make([]int, len(grp))
+		} else {
+			tmp = tmp[:len(grp)]
+		}
+		cur := grp
+		aux := tmp
+		for pos := l - 1; pos >= 0; pos-- {
+			for i := range counts {
+				counts[i] = 0
+			}
+			for _, idx := range cur {
+				counts[int(pairs[idx].Key[pos])]++
+			}
+			sum := 0
+			for i := 0; i < byteValueCount; i++ {
+				c := counts[i]
+				counts[i] = sum
+				sum += c
+			}
+			for _, idx := range cur {
+				bv := pairs[idx].Key[pos]
+				p := counts[int(bv)]
+				aux[p] = idx
+				counts[int(bv)] = p + 1
+			}
+			cur, aux = aux, cur
+		}
+		order = append(order, cur...)
+	}
+	b = AppendMapHeader(b, uint32(n))
+	for _, i := range order {
+		b = append(b, pairs[i].Key...)
+		b = append(b, pairs[i].Value...)
+	}
+	return b
 }
 
 // AppendMapDeterministic appends a map[K]V deterministically.
@@ -1017,81 +1061,102 @@ func AppendRawMapDeterministic(b []byte, pairs []RawPair) []byte {
 // encVal appends the CBOR encoding of value v to dst and returns the extended dst.
 // Keys are encoded once for sorting and then reused to avoid re-encoding.
 func AppendMapDeterministic[K comparable, V any](b []byte, m map[K]V,
-    encKey func(dst []byte, k K) []byte,
-    encVal func(dst []byte, v V) ([]byte, error),
+	encKey func(dst []byte, k K) []byte,
+	encVal func(dst []byte, v V) ([]byte, error),
 ) ([]byte, error) {
-    type item struct {
-        keyEnc []byte
-        key    K
-        val    V
-    }
-    items := make([]item, 0, len(m))
-    // Use a single growing scratch buffer to hold all encoded keys.
-    // This reduces per-key allocations. Each keyEnc stores a subslice
-    // of the scratch at the moment of encoding; later growth may reallocate
-    // scratch, but the subslices retain references to the older backing arrays.
-    var scratch []byte
-    for k, v := range m {
-        prev := len(scratch)
-        scratch = encKey(scratch, k)
-        ke := scratch[prev:]
-        items = append(items, item{keyEnc: ke, key: k, val: v})
-    }
-    // Bucket by encoded key length, then LSD radix within groups.
-    byLen := make(map[int][]int)
-    for i := range items { byLen[len(items[i].keyEnc)] = append(byLen[len(items[i].keyEnc)], i) }
-    lens := make([]int, 0, len(byLen))
-    for l := range byLen { lens = append(lens, l) }
-    sort.Ints(lens)
-    order := make([]int, 0, len(items))
-    counts := make([]int, 256)
-    var tmpIdx []int
-    for _, l := range lens {
-        grp := byLen[l]
-        if len(grp) <= 1 { order = append(order, grp...); continue }
-        // Adaptive: comparator wins for small groups/short keys
-        if l < 64 && len(grp) < 1024 {
-            sort.Slice(grp, func(i, j int) bool { return bytes.Compare(items[grp[i]].keyEnc, items[grp[j]].keyEnc) < 0 })
-            order = append(order, grp...)
-            continue
-        }
-        if cap(tmpIdx) < len(grp) { tmpIdx = make([]int, len(grp)) } else { tmpIdx = tmpIdx[:len(grp)] }
-        cur := grp
-        aux := tmpIdx
-        for pos := l - 1; pos >= 0; pos-- {
-            for i := range counts { counts[i] = 0 }
-            for _, idx := range cur { counts[int(items[idx].keyEnc[pos])]++ }
-            sum := 0
-            for i := 0; i < 256; i++ { c := counts[i]; counts[i] = sum; sum += c }
-            for _, idx := range cur {
-                bv := items[idx].keyEnc[pos]
-                p := counts[int(bv)]
-                aux[p] = idx
-                counts[int(bv)] = p + 1
-            }
-            cur, aux = aux, cur
-        }
-        order = append(order, cur...)
-    }
-    b = AppendMapHeader(b, uint32(len(items)))
-    var err error
-    for _, oi := range order {
-        b = append(b, items[oi].keyEnc...)
-        b, err = encVal(b, items[oi].val)
-        if err != nil { return b, err }
-    }
-    return b, nil
+	type item struct {
+		keyEnc []byte
+		key    K
+		val    V
+	}
+	items := make([]item, 0, len(m))
+	// Use a single growing scratch buffer to hold all encoded keys.
+	// This reduces per-key allocations. Each keyEnc stores a subslice
+	// of the scratch at the moment of encoding; later growth may reallocate
+	// scratch, but the subslices retain references to the older backing arrays.
+	var scratch []byte
+	for k, v := range m {
+		prev := len(scratch)
+		scratch = encKey(scratch, k)
+		ke := scratch[prev:]
+		items = append(items, item{keyEnc: ke, key: k, val: v})
+	}
+	// Bucket by encoded key length, then LSD radix within groups.
+	byLen := make(map[int][]int)
+	for i := range items {
+		byLen[len(items[i].keyEnc)] = append(byLen[len(items[i].keyEnc)], i)
+	}
+	lens := make([]int, 0, len(byLen))
+	for l := range byLen {
+		lens = append(lens, l)
+	}
+	sort.Ints(lens)
+	order := make([]int, 0, len(items))
+	counts := make([]int, byteValueCount)
+	var tmpIdx []int
+	for _, l := range lens {
+		grp := byLen[l]
+		if len(grp) <= 1 {
+			order = append(order, grp...)
+			continue
+		}
+		// Adaptive: comparator wins for small groups/short keys
+		if l < 64 && len(grp) < 1024 {
+			sort.Slice(grp, func(i, j int) bool { return bytes.Compare(items[grp[i]].keyEnc, items[grp[j]].keyEnc) < 0 })
+			order = append(order, grp...)
+			continue
+		}
+		if cap(tmpIdx) < len(grp) {
+			tmpIdx = make([]int, len(grp))
+		} else {
+			tmpIdx = tmpIdx[:len(grp)]
+		}
+		cur := grp
+		aux := tmpIdx
+		for pos := l - 1; pos >= 0; pos-- {
+			for i := range counts {
+				counts[i] = 0
+			}
+			for _, idx := range cur {
+				counts[int(items[idx].keyEnc[pos])]++
+			}
+			sum := 0
+			for i := 0; i < byteValueCount; i++ {
+				c := counts[i]
+				counts[i] = sum
+				sum += c
+			}
+			for _, idx := range cur {
+				bv := items[idx].keyEnc[pos]
+				p := counts[int(bv)]
+				aux[p] = idx
+				counts[int(bv)] = p + 1
+			}
+			cur, aux = aux, cur
+		}
+		order = append(order, cur...)
+	}
+	b = AppendMapHeader(b, uint32(len(items)))
+	var err error
+	for _, oi := range order {
+		b = append(b, items[oi].keyEnc...)
+		b, err = encVal(b, items[oi].val)
+		if err != nil {
+			return b, err
+		}
+	}
+	return b, nil
 }
 
 // Common key encoders (for AppendMapDeterministic)
-func EncKeyString(dst []byte, s string) []byte  { return AppendString(dst, s) }
-func EncKeyBytes(dst []byte, bs []byte) []byte  { return AppendBytes(dst, bs) }
-func EncKeyInt(dst []byte, i int) []byte        { return AppendInt(dst, i) }
-func EncKeyInt64(dst []byte, i int64) []byte    { return AppendInt64(dst, i) }
-func EncKeyUint64(dst []byte, u uint64) []byte  { return AppendUint64(dst, u) }
-func EncKeyBool(dst []byte, v bool) []byte      { return AppendBool(dst, v) }
-func EncKeyFloat64(dst []byte, f float64) []byte{ return AppendFloat64(dst, f) }
-func EncKeyTime(dst []byte, t time.Time) []byte { return AppendTime(dst, t) }
+func EncKeyString(dst []byte, s string) []byte   { return AppendString(dst, s) }
+func EncKeyBytes(dst []byte, bs []byte) []byte   { return AppendBytes(dst, bs) }
+func EncKeyInt(dst []byte, i int) []byte         { return AppendInt(dst, i) }
+func EncKeyInt64(dst []byte, i int64) []byte     { return AppendInt64(dst, i) }
+func EncKeyUint64(dst []byte, u uint64) []byte   { return AppendUint64(dst, u) }
+func EncKeyBool(dst []byte, v bool) []byte       { return AppendBool(dst, v) }
+func EncKeyFloat64(dst []byte, f float64) []byte { return AppendFloat64(dst, f) }
+func EncKeyTime(dst []byte, t time.Time) []byte  { return AppendTime(dst, t) }
 
 // Common value encoders (for AppendMapDeterministic)
 func EncValString(dst []byte, s string) ([]byte, error)   { return AppendString(dst, s), nil }
@@ -1109,38 +1174,38 @@ func EncValInterface(dst []byte, v any) ([]byte, error) { return AppendInterface
 
 // Typed deterministic appenders for common key/value types
 func AppendMapDeterministicStrStr(b []byte, m map[string]string) []byte {
-    out, _ := AppendMapDeterministic(b, m, EncKeyString, EncValString)
-    return out
+	out, _ := AppendMapDeterministic(b, m, EncKeyString, EncValString)
+	return out
 }
 
 func AppendMapDeterministicStrInt64(b []byte, m map[string]int64) []byte {
-    out, _ := AppendMapDeterministic(b, m, EncKeyString, EncValInt64)
-    return out
+	out, _ := AppendMapDeterministic(b, m, EncKeyString, EncValInt64)
+	return out
 }
 
 func AppendMapDeterministicStrInt(b []byte, m map[string]int) []byte {
-    out, _ := AppendMapDeterministic(b, m, EncKeyString, EncValInt)
-    return out
+	out, _ := AppendMapDeterministic(b, m, EncKeyString, EncValInt)
+	return out
 }
 
 func AppendMapDeterministicStrUint64(b []byte, m map[string]uint64) []byte {
-    out, _ := AppendMapDeterministic(b, m, EncKeyString, EncValUint64)
-    return out
+	out, _ := AppendMapDeterministic(b, m, EncKeyString, EncValUint64)
+	return out
 }
 
 func AppendMapDeterministicStrBool(b []byte, m map[string]bool) []byte {
-    out, _ := AppendMapDeterministic(b, m, EncKeyString, EncValBool)
-    return out
+	out, _ := AppendMapDeterministic(b, m, EncKeyString, EncValBool)
+	return out
 }
 
 func AppendMapDeterministicStrFloat64(b []byte, m map[string]float64) []byte {
-    out, _ := AppendMapDeterministic(b, m, EncKeyString, EncValFloat64)
-    return out
+	out, _ := AppendMapDeterministic(b, m, EncKeyString, EncValFloat64)
+	return out
 }
 
 func AppendMapDeterministicStrBytes(b []byte, m map[string][]byte) []byte {
-    out, _ := AppendMapDeterministic(b, m, EncKeyString, EncValBytes)
-    return out
+	out, _ := AppendMapDeterministic(b, m, EncKeyString, EncValBytes)
+	return out
 }
 
 func AppendMapDeterministicStrInterface(b []byte, m map[string]any) ([]byte, error) {
