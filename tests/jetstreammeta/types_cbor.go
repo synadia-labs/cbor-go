@@ -5,7 +5,7 @@ package jetstreammeta
 import (
 	"time"
 
-	cbor "github.com/synadia-labs/cbor-go/runtime"
+	cbor "github.com/synadia-labs/cbor.go/runtime"
 )
 
 func (x ClientInfo) Msgsize() (s int) {

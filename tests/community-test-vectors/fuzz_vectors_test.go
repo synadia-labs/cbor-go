@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	cbor "github.com/synadia-labs/cbor-go/runtime"
+	cbor "github.com/synadia-labs/cbor.go/runtime"
 )
 
 // FuzzCommunityVectors fuzzes around the community vectors by

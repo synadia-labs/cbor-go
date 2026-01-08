@@ -3,7 +3,7 @@ package benchmarks
 import (
 	"testing"
 
-	cbor "github.com/synadia-labs/cbor-go/runtime"
+	cbor "github.com/synadia-labs/cbor.go/runtime"
 	msgp "github.com/tinylib/msgp/msgp"
 )
 

@@ -15,7 +15,7 @@ import (
 
 	"golang.org/x/tools/imports"
 
-	tmplfs "github.com/synadia-labs/cbor-go/cborgen/templates"
+	tmplfs "github.com/synadia-labs/cbor.go/cborgen/templates"
 )
 
 // generatedStructs tracks struct types for which cborgen is generating
@@ -1337,7 +1337,7 @@ func decodeCaseExprTrusted(structName, goName string, typ ast.Expr) (string, boo
 }
 
 // marshalTemplate drives per-struct MarshalCBOR/UnmarshalCBOR generation.
-// It uses the runtime helpers from github.com/synadia-labs/cbor-go/runtime.
+// It uses the runtime helpers from github.com/synadia-labs/cbor.go/runtime.
 //
 // ParseFS returns templates named by their filenames; we parse the
 // marshal.go.tpl file and then execute that template directly.

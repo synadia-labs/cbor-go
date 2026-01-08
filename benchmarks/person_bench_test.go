@@ -8,7 +8,7 @@ import (
 	fxcbor "github.com/fxamacker/cbor/v2"
 	msgp "github.com/tinylib/msgp/msgp"
 
-	"github.com/synadia-labs/cbor-go/tests/structs"
+	"github.com/synadia-labs/cbor.go/tests/structs"
 )
 
 // benchPerson mirrors the fields of structs.Person but is defined

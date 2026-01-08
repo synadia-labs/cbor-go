@@ -3,7 +3,7 @@ package tests
 import (
 	"testing"
 
-	cbor "github.com/synadia-labs/cbor-go/runtime"
+	cbor "github.com/synadia-labs/cbor.go/runtime"
 )
 
 // FuzzJSONInterop fuzzes the JSON wrappers and general FromJSONBytes /

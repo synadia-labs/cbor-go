@@ -1,4 +1,4 @@
-# github.com/synadia-labs/cbor-go
+# github.com/synadia-labs/cbor.go
 
 CBOR support for Go with a focus on **clear safety modes** and an ergonomic, high-performance code generator.
 
@@ -98,14 +98,14 @@ as a binary in your own module.
 Generate code for a single file:
 
 ```bash
-go run github.com/synadia-labs/cbor-go/cborgen@latest -i mytypes.go
+go run github.com/synadia-labs/cbor.go/cborgen@latest -i mytypes.go
 ```
 
 By default this writes `mytypes_cbor.go` next to `mytypes.go`. You can
 override the output path:
 
 ```bash
-go run github.com/synadia-labs/cbor-go/cborgen@latest -i mytypes.go -o internal/gen/mytypes_cbor.go
+go run github.com/synadia-labs/cbor.go/cborgen@latest -i mytypes.go -o internal/gen/mytypes_cbor.go
 ```
 
 Flags:
@@ -119,7 +119,7 @@ Flags:
 In a Go source file in your module, add a `go generate` directive:
 
 ```go
-//go:generate go run github.com/synadia-labs/cbor-go/cborgen@latest -i $GOFILE
+//go:generate go run github.com/synadia-labs/cbor.go/cborgen@latest -i $GOFILE
 ```
 
 ### Behavior with files vs directories
@@ -147,16 +147,16 @@ Internally, the generator builds on the core `cbor` runtime and emits:
 ### Runtime dependency (direct import)
 
 `cborgen` now emits code that imports the runtime helpers directly from
-`github.com/synadia-labs/cbor-go/runtime` (aliased as `cbor`). The generated files no
+`github.com/synadia-labs/cbor.go/runtime` (aliased as `cbor`). The generated files no
 longer materialize a `cbor_runtime.go` copy alongside your types.
 
 As a result, the generated code:
 
-- Imports `github.com/synadia-labs/cbor-go/runtime`.
+- Imports `github.com/synadia-labs/cbor.go/runtime`.
 - Requires the module dependency at build/runtime (not just the standard
   library).
 
-You still need `github.com/synadia-labs/cbor-go` in your module if you want to use the
+You still need `github.com/synadia-labs/cbor.go` in your module if you want to use the
 standalone `runtime` package or the `cborgen` tool via `go run` / `go install`.
 
 ---
@@ -169,13 +169,13 @@ directly as a module command.
 **One-off runs** (no install):
 
 ```bash
-go run github.com/synadia-labs/cbor-go/cborgen@latest -i mytypes.go
+go run github.com/synadia-labs/cbor.go/cborgen@latest -i mytypes.go
 ```
 
 **Installed binary**:
 
 ```bash
-go install github.com/synadia-labs/cbor-go/cborgen@latest
+go install github.com/synadia-labs/cbor.go/cborgen@latest
 
 cborgen -i mytypes.go
 ```
@@ -183,7 +183,7 @@ cborgen -i mytypes.go
 **With `go generate`** using `go run`:
 
 ```go
-//go:generate go run github.com/synadia-labs/cbor-go/cborgen@latest
+//go:generate go run github.com/synadia-labs/cbor.go/cborgen@latest
 ```
 
 The semantics of `-i/-o/-v` and file vs directory inputs are the same as when
@@ -196,7 +196,7 @@ invoked via `go tool`.
 The runtime package provides helpers to convert between JSON and CBOR using a
 wrapper convention compatible with the prototype and the RFC examples.
 
-Key APIs (in `github.com/synadia-labs/cbor-go/runtime`):
+Key APIs (in `github.com/synadia-labs/cbor.go/runtime`):
 
 - `FromJSONBytes(js []byte) ([]byte, error)`
   - Parses a JSON document into a Go value tree (`map[string]any`, `[]any`,

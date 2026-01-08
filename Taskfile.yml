@@ -2,7 +2,7 @@ version: '3'
 
 vars:
   VECTORS_DIR: tests/community-test-vectors
-  VERSION: 0.0.5
+  VERSION: 0.0.6
 
 tasks:
   version:
@@ -13,7 +13,7 @@ tasks:
       - git push origin
       - git tag v{{.VERSION}}
       - git push --tags
-      - GOPROXY=proxy.golang.org go list -m github.com/synadia-labs/cbor-go@v{{.VERSION}}
+      - GOPROXY=proxy.golang.org go list -m github.com/synadia-labs/cbor.go@v{{.VERSION}}
 
   fetch-vectors:
     desc: Clone or update community CBOR test-vectors into testdata

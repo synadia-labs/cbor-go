@@ -3,7 +3,7 @@ package structs
 import (
 	"testing"
 
-	cbor "github.com/synadia-labs/cbor-go/runtime"
+	cbor "github.com/synadia-labs/cbor.go/runtime"
 )
 
 type personDecoder struct {

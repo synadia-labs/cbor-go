@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	cbor "github.com/synadia-labs/cbor-go/runtime"
+	cbor "github.com/synadia-labs/cbor.go/runtime"
 )
 
 // readFileTrim reads a text file and trims trailing newlines.

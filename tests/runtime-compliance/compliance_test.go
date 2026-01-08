@@ -7,7 +7,7 @@ import (
 	"math"
 	"testing"
 
-	cbor "github.com/synadia-labs/cbor-go/runtime"
+	cbor "github.com/synadia-labs/cbor.go/runtime"
 )
 
 func mustHex(t *testing.T, s string) []byte {

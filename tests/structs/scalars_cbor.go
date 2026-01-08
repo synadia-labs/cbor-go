@@ -5,7 +5,7 @@ package structs
 import (
 	"time"
 
-	cbor "github.com/synadia-labs/cbor-go/runtime"
+	cbor "github.com/synadia-labs/cbor.go/runtime"
 )
 
 func (x Scalars) Msgsize() (s int) {

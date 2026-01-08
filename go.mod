@@ -1,4 +1,4 @@
-module github.com/synadia-labs/cbor-go
+module github.com/synadia-labs/cbor.go
 
 go 1.25
 

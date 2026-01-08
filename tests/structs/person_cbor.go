@@ -2,7 +2,7 @@
 
 package structs
 
-import cbor "github.com/synadia-labs/cbor-go/runtime"
+import cbor "github.com/synadia-labs/cbor.go/runtime"
 
 func (x Person) Msgsize() (s int) {
 	s = cbor.MapHeaderSize + cbor.StringPrefixSize + len("name") + cbor.StringPrefixSize + len(x.Name) + cbor.StringPrefixSize + len("age") + cbor.IntSize + cbor.StringPrefixSize + len("data") + cbor.BytesPrefixSize + len(x.Data)

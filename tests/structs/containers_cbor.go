@@ -2,7 +2,7 @@
 
 package structs
 
-import cbor "github.com/synadia-labs/cbor-go/runtime"
+import cbor "github.com/synadia-labs/cbor.go/runtime"
 
 func (x Containers) Msgsize() (s int) {
 	s = cbor.MapHeaderSize + cbor.StringPrefixSize + len("items") + cbor.ArrayHeaderSize + len(x.Items)*0 + cbor.StringPrefixSize + len("map") + cbor.MapHeaderSize + len(x.Map)*(cbor.StringPrefixSize+0)

@@ -3,7 +3,7 @@ package benchmarks
 import (
 	"testing"
 
-	"github.com/synadia-labs/cbor-go/tests/jetstreammeta"
+	"github.com/synadia-labs/cbor.go/tests/jetstreammeta"
 )
 
 // BenchmarkCBORRuntime_JetStreamMetaSnapshot_Encode exercises CBOR

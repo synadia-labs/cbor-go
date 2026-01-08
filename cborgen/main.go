@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/alecthomas/kong"
-	"github.com/synadia-labs/cbor-go/cborgen/core"
+	"github.com/synadia-labs/cbor.go/cborgen/core"
 )
 
 // CLI defines the cborgen command-line interface.

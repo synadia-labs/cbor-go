@@ -3,7 +3,7 @@ package jetstreammeta_msgp
 import (
 	"fmt"
 
-	js "github.com/synadia-labs/cbor-go/tests/jetstreammeta"
+	js "github.com/synadia-labs/cbor.go/tests/jetstreammeta"
 )
 
 // MsgpMetaSnapshot and its nested types mirror the structure of

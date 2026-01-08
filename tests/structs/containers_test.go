@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	cbor "github.com/synadia-labs/cbor-go/runtime"
+	cbor "github.com/synadia-labs/cbor.go/runtime"
 )
 
 type containersDecoder struct {

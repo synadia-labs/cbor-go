@@ -2,7 +2,7 @@
 
 package {{.Package}}
 
-import cbor "github.com/synadia-labs/cbor-go/runtime"
+import cbor "github.com/synadia-labs/cbor.go/runtime"
 
 {{range .Structs}}
 {{if .MsgSizeExpr}}
